@@ -22,7 +22,7 @@ void rangingTableSetInit() {
     for (int i = 0; i < RANGING_TABLE_SIZE; i++) {
         rangingTableInit(&rangingTableSet->rangingTable[i]);
         rangingTableSet->lastRxtimestamp[i] = nullTimestampTuple;
-        rangingTableSet->prorityQueue[i] = NULL_INDEX;
+        rangingTableSet->priorityQueue[i] = NULL_INDEX;
     }
 }
 
@@ -84,17 +84,17 @@ void updateSendList(SendList_t *sendList, Timestamp_Tuple_t timestampTuple) {
 
 // update the priority queue, push address to the tail
 void updatePriority(Ranging_Table_Set_t *rangingTableSet, uint16_t address) {
-    index_t *prorityQueue = rangingTableSet->prorityQueue;
+    index_t *queue = rangingTableSet->priorityQueue;
 
     for(int i = 0; i < rangingTableSet->counter; i++) {
         if(rangingTableSet->rangingTable[i].neighborAddress == address) {
             // move the index of table to the tail of priority queue
             for(int j = i; j < rangingTableSet->counter - 1; j++) {
-                uint8_t tmp = rangingTableSet->prorityQueue[j];
-                rangingTableSet->prorityQueue[j] = rangingTableSet->prorityQueue[j + 1];
-                rangingTableSet->prorityQueue[j + 1] = tmp;
+                uint8_t tmp = queue[j];
+                queue[j] = queue[j + 1];
+                queue[j + 1] = tmp;
             }
-            rangingTableSet->prorityQueue[rangingTableSet->counter - 1] = i;
+            queue[rangingTableSet->counter - 1] = i;
             return;
         }
     }
@@ -111,7 +111,7 @@ Time_t generateMessage(Ranging_Message_t *rangingMessage) {
     while(bodyUnitCount < MESSAGE_BODY_UNIT_SIZE && bodyUnitCount < rangingTableSet->counter) {
         Message_Body_Unit_t *bodyUnit = &rangingMessage->bodyUnits[bodyUnitCount];
         if(bodyUnit->Rxtimestamp.timestamp.full != nullTimestampTuple.timestamp.full) {
-            index_t index = rangingTableSet->prorityQueue[bodyUnitCount];
+            index_t index = rangingTableSet->priorityQueue[bodyUnitCount];
 
             bodyUnit->address = rangingTableSet->rangingTable[index].neighborAddress;
             bodyUnit->Rxtimestamp = rangingTableSet->lastRxtimestamp[index];
@@ -155,6 +155,9 @@ Time_t generateMessage(Ranging_Message_t *rangingMessage) {
 
 void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAdditionalInfo) {
     Ranging_Message_t *rangingMessage = &rangingMessageWithAdditionalInfo->rangingMessage;
+
+    printRangingMessage(rangingMessage);
+
     uint16_t neighborAddress = rangingMessage->header.srcAddress;
     index_t neighborIndex = findRangingTable(rangingTableSet, neighborAddress);
 
@@ -170,6 +173,8 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
     else {
         updatePriority(rangingTableSet, neighborAddress);
     }
+
+    printPriorityQueue();
 
     Ranging_Table_t *rangingTable = &rangingTableSet->rangingTable[neighborIndex];
 
@@ -204,6 +209,7 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
 
     /* process header */
     Timestamp_Tuple_t Rx = rangingTableSet->lastRxtimestamp[neighborIndex];
+    rangingTableSet->lastRxtimestamp[neighborIndex] = Rr;
 
     Timestamp_Tuple_t Tx = nullTimestampTuple;
     for(int i = 0; i < MESSAGE_TX_POOL_SIZE; i++) {
@@ -220,7 +226,7 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
         +------+------+------+------+
     */
     if(initCalculateRound < INIT_CALCULATION_ROUNDS) {
-        float initTof = assistedCalculateTof(rangingTable, Tx, Rx, Tn, Rn);
+        float initTof = assistedCalculateTof(rangingTable, Tx, Rx, Tn, Rn, INIT);
 
         if(initTof != NULL_TOF) {
             initCalculateRound++;
@@ -246,15 +252,16 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
                     Ranging_Table_t tmpRangingTable;
                     tmpRangingTable.T4 = rangingTable->T2;
                     tmpRangingTable.R4 = rangingTable->R2;
-                    initTof = assistedCalculateTof(&tmpRangingTable, rangingTable->T3, rangingTable->R3, Tn, Rn);
+                    initTof = assistedCalculateTof(&tmpRangingTable, rangingTable->T3, rangingTable->R3, Tn, Rn, INIT);
                 }
                 // Tx and Rx are full
-                else(Tx.timestamp.full != NULL_TIMESTAMP && Rx.timestamp.full != NULL_TIMESTAMP);
+                else if(Tx.timestamp.full != NULL_TIMESTAMP && Rx.timestamp.full != NULL_TIMESTAMP) {
                     Ranging_Table_t tmpRangingTable;
                     tmpRangingTable.T4 = rangingTable->T3;
                     tmpRangingTable.R4 = rangingTable->R3;
-                    initTof = assistedCalculateTof(&tmpRangingTable, rangingTable->T4, rangingTable->R4, Tx, Rx);
-                if(initTof == NULL_TOF) {
+                    initTof = assistedCalculateTof(&tmpRangingTable, rangingTable->T4, rangingTable->R4, Tx, Rx, INIT);
+                }
+                    if(initTof == NULL_TOF) {
                     initTof = rangingTable->Tof;
                 }
             }
@@ -283,15 +290,54 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
     else {
         float Tof = calculateTof(rangingTable, Tx, Rx, Tn, Rn, FIRST_CALCULATE);
         if(Tof != NULL_TOF) {
-            
+            shiftRangingTable(rangingTable);
+            fillRangingTable(rangingTable, Tx, Rx, Tn, Rn, Rr, Tof);
+        }
+
+        // calculation failed
+        else {
+            // data loss caused by lossing packet ---> calculate
+            // Tn and Rn are full
+            if(Tn.timestamp.full != NULL_TIMESTAMP && Rn.timestamp.full != NULL_TIMESTAMP) {
+                Ranging_Table_t tmpRangingTable;
+                tmpRangingTable.T3 = rangingTable->T1;
+                tmpRangingTable.R3 = rangingTable->R1;
+                tmpRangingTable.T4 = rangingTable->T2;
+                tmpRangingTable.R4 = rangingTable->R2;
+                Tof = calculateTof(&tmpRangingTable, rangingTable->T3, rangingTable->R3, Tn, Rn, SECOND_CALCULATE);
+            }
+            // Tx and Rx are full
+            else if(Tx.timestamp.full != NULL_TIMESTAMP && Rx.timestamp.full != NULL_TIMESTAMP) {
+                Ranging_Table_t tmpRangingTable;
+                tmpRangingTable.T3 = rangingTable->T2;
+                tmpRangingTable.R3 = rangingTable->R2;
+                tmpRangingTable.T4 = rangingTable->T3;
+                tmpRangingTable.R4 = rangingTable->R3;
+                Tof = calculateTof(&tmpRangingTable, rangingTable->T4, rangingTable->R4, Tx, Rx, SECOND_CALCULATE);
+            }
+            if(Tof == NULL_TOF) {
+                Tof = rangingTable->Tof;
+            }
+        }
+        if(Tof != NULL_TOF) {
+            DEBUG_PRINT("[current_%u]: ModifiedD = %f, ClassicD = %f", MY_UWB_ADDRESS, Tof, Tof);
+            #ifdef COORDINATE_SEND_ENABLE
+                DEBUG_PRINT(", TrueD = %f\n", TrueD);
+            #else
+                DEBUG_PRINT("\n");
+            #endif
         }
         else {
-
+            DEBUG_PRINT("Warning: CalculateTof failed\n");
         }
     }
 
+}
 
-
-
-    rangingTableSet->lastRxtimestamp[neighborIndex] = Rr;
+void printPriorityQueue() {
+    DEBUG_PRINT("\n{priorityQueue}\n");
+    for(int i = 0; i < rangingTableSet->counter; i++) {
+        DEBUG_PRINT("%d - %u\n", i + 1, rangingTableSet->rangingTable[rangingTableSet->priorityQueue[i]].neighborAddress);
+    }
+    DEBUG_PRINT("\n");
 }

@@ -26,11 +26,6 @@ typedef struct {
 } NodeMessage;
 
 typedef struct {
-    Ranging_Message_t rangingMessage;
-    Coordinate_Tuple_t location;
-} __attribute__((packed)) MessageWithLocation;
-
-typedef struct {
     int socket;
     char node_id[ID_SIZE];
 } NodeInfo;

@@ -16,5 +16,7 @@ void updateSendList(SendList_t *sendList, Timestamp_Tuple_t timestampTuple);
 #endif
 Time_t generateMessage(Ranging_Message_t *rangingMessage);
 void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAdditionalInfo);
+void printPriorityQueue();
+
 
 #endif

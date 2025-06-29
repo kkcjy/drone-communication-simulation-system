@@ -7,7 +7,7 @@
 
 #define         NULL_ADDR                   0xFFFF
 #define         NULL_SEQ                    0xFFFF
-#define         NULL_TIMESTAMP              0xFFFFFFFFFFFFFFFFULL
+#define         NULL_TIMESTAMP              0xFFFFFFFFU
 #define         NULL_INDEX                  0xFF
 #define         NULL_TOF                    -1.0f
 
@@ -18,10 +18,11 @@
 #define         MESSAGE_BODY_UNIT_SIZE      10
 
 #define         SEND_LIST_SIZE              5
-#define         RANGING_TABLE_SIZE          10                  // max number of neighbors
+#define         RANGING_TABLE_SIZE          10                
 
 #define         RANGING_PERIOD              200
 #define         UWB_MAX_TIMESTAMP           1099511627776
+#define         VELOCITY                    0.4691763978616
 #define         CONVERGENCE_THRESHOLD       0.989
 #define         INIT_CALCULATION_ROUNDS     4
 

@@ -1,5 +1,5 @@
 #include "socket_frame.h"
-#include "modified_ranging.h"
+#include "ranging_protocol.h"
 
 NodeInfo nodes[MAX_NODES];
 int node_count = 0;
@@ -57,12 +57,11 @@ void *handle_node_connection(void *arg) {
     NodeMessage msg;
     while ((bytes_received = recv(node_socket, &msg, sizeof(msg), 0)) > 0) {
         // Print function
-        MessageWithLocation *modified_msg = (MessageWithLocation*)msg.data; 
-        Ranging_Message_t *rangingMessage = &modified_msg->rangingMessage;
+        Ranging_Message_t *ranging_msg = (Ranging_Message_t*)msg.data;
         // printf("\n********************[%s]********************\n", node_id);
-        // printRangingMessage(rangingMessage);
+        // printRangingMessage(ranging_msg);
         // printf("********************[%s]********************\n", node_id);
-        printf("broadcast [%s], address = %d, msgSeq = %d, time = %ld\n", node_id, rangingMessage->header.srcAddress, rangingMessage->header.msgSequence, get_current_milliseconds() - worldBaseTime);
+        printf("broadcast [%s], address = %d, msgSeq = %d, time = %ld\n", node_id, ranging_msg->header.srcAddress, ranging_msg->header.msgSequence, get_current_milliseconds() - worldBaseTime);
 
         // Immediately broadcast received message to all nodes
         broadcast_to_nodes(&msg);

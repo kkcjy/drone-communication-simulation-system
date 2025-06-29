@@ -14,6 +14,6 @@ typedef union {
 		uint8_t low8;
 		uint32_t high32;
 	} __attribute__((packed));
-} dwTime_t;			// 8 byte
+} dwTime_t;		
 
 #endif

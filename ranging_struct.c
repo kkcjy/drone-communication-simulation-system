@@ -28,7 +28,7 @@ table_index_t registerRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_
 
     rangingTableSet->rangingTable[rangingTableSet->counter].neighborAddress = address;
     rangingTableSet->rangingTable[rangingTableSet->counter].state = USING;
-    rangingTableSet->prorityQueue[rangingTableSet->counter] = rangingTableSet->counter;
+    rangingTableSet->priorityQueue[rangingTableSet->counter] = rangingTableSet->counter;
     rangingTableSet->counter++;
 
     return rangingTableSet->counter - 1;
@@ -100,7 +100,7 @@ void fillRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, Times
             Ranging_Table_t correctRangingTable;
             correctRangingTable.T4 = rangingTable->T2;
             correctRangingTable.R4 = rangingTable->R2;
-            float correctTof = assistedCalculateTof(&correctRangingTable, Tx, Rx, Tn, Rn);
+            float correctTof = assistedCalculateTof(&correctRangingTable, Tx, Rx, Tn, Rn, CORRECT);
             rangingTable->Tof = correctTof;
         }
     }
@@ -109,13 +109,15 @@ void fillRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, Times
     }
 }
 
-// data should be strictly contigurous for initializing and correcting Tof
-float assistedCalculateTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, Timestamp_Tuple_t Rx, Timestamp_Tuple_t Tn, Timestamp_Tuple_t Rn) {
-/*      
+/* assist calculating the Time of Flight (ToF) based on the timestamps in the ranging table
        Rp   <--Db-->    Tx      <--Rb-->       Rn
 
     Tp      <--Ra-->      Rx    <--Da-->    Tn
-*/
+
+    INIT mode:      data should be in order
+    CORRECT mode:   data should be strictly contigurous and in order
+*/ 
+float assistedCalculateTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, Timestamp_Tuple_t Rx, Timestamp_Tuple_t Tn, Timestamp_Tuple_t Rn, CalculateMode mode) {
     Timestamp_Tuple_t Tp, Rp;
     Tp = rangingTable->T4;
     Rp = rangingTable->R4;
@@ -125,10 +127,12 @@ float assistedCalculateTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, 
         return NULL_TOF;
     }
 
-    // make sure Tp, Tn are contiguous
-    if((uint16_t)(Tp.seqNumber + 1) != Tn.seqNumber) {
-        DEBUG_PRINT("Warning: Computational data non-contiguous\n");
-        return NULL_TOF;
+    if(mode == CORRECT) {
+        // make sure Tp, Tn are contiguous
+        if((uint16_t)(Tp.seqNumber + 1) != Tn.seqNumber) {
+            DEBUG_PRINT("Warning: Computational data non-contiguous\n");
+            return NULL_TOF;
+        }
     }
 
     // make sure Tp, Rx, Tn are in order
@@ -285,4 +289,22 @@ second calculation:
         }
     }
     return Tof34;
+}
+
+void printRangingMessage(Ranging_Message_t *rangingMessage) {
+    DEBUG_PRINT("\n{rangingMessage}\n");
+
+    DEBUG_PRINT("srcAddress: %u\n", rangingMessage->header.srcAddress);
+    DEBUG_PRINT("msgSequence: %u\n", rangingMessage->header.msgSequence);
+
+    DEBUG_PRINT("[Tx]\n");
+    for(int i = 0; i < MESSAGE_TX_POOL_SIZE; i++) {
+        DEBUG_PRINT("seqNumber: %u, timestamp: %llu\n", rangingMessage->header.Txtimestamps[i].seqNumber, rangingMessage->header.Txtimestamps[i].timestamp.full);
+    }
+
+    DEBUG_PRINT("[Rx]:\n");
+    for(int i = 0; i < MESSAGE_BODY_UNIT_SIZE; i++){
+        DEBUG_PRINT("address: %u, seqNumber: %u, timestamp: %llu\n", rangingMessage->bodyUnits[i].address, rangingMessage->bodyUnits[i].Rxtimestamp.seqNumber, rangingMessage->bodyUnits[i].Rxtimestamp.timestamp.full);
+    }
+    DEBUG_PRINT("\n");
 }

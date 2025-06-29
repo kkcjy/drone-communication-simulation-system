@@ -27,7 +27,7 @@ Time_t QueueTaskTx(QueueTaskLock_t *queue, int msgSize, SendFunction send_to_cen
         return NULL_TIMESTAMP;
     }
 
-    Time_t timeDelay = generateRangingMessage(rangingMessage);
+    Time_t timeDelay = generateMessage(rangingMessage);
 
     pthread_mutex_unlock(&queue->mutex);
 
@@ -91,9 +91,9 @@ PROCESS:
 
     #ifdef DYNAMIC_RANGING_FREQUENCY_ENABLE
         // distance < SAFE_DISTANCE -> unsafe
-        bool unSafe = processRangingMessage(rangingMessageWithAdditionalInfo);
+        bool unSafe = processMessage(rangingMessageWithAdditionalInfo);
     #else
-        processRangingMessage(rangingMessageWithAdditionalInfo);
+        processMessage(rangingMessageWithAdditionalInfo);
     #endif
 
     free(queue->queueTask[queue->head].data);

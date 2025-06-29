@@ -16,25 +16,15 @@ QueueTaskLock_t queueTaskLock;                  // lock for task
 void send_to_center(int center_socket, const char* node_id, const Ranging_Message_t* ranging_msg) {
     NodeMessage msg;
 
-    if(sizeof(MessageWithLocation) > MESSAGE_SIZE) {
+    if(sizeof(Ranging_Message_t) > MESSAGE_SIZE) {
         printf("Warning: %ld > %ld, Ranging_Message_t too large!\n", sizeof(Ranging_Message_t), MESSAGE_SIZE);
     }
 
     snprintf(msg.sender_id, sizeof(msg.sender_id), "%s", node_id);  
 
-    MessageWithLocation modified_msg;
-    memcpy(&modified_msg.rangingMessage, ranging_msg, sizeof(*ranging_msg));
-    dwTime_t curTime;
-    curTime.full = getCurrentTime();
-    #ifdef COORDINATE_SEND_ENABLE
-        Coordinate_Tuple_t curLocation = getCurrentLocation();
-    #endif
-    modified_msg.location = curLocation;
-    memcpy(msg.data, &modified_msg, sizeof(MessageWithLocation)); 
+    memcpy(msg.data, ranging_msg, sizeof(Ranging_Message_t));
 
-    msg.data_size = sizeof(MessageWithLocation);
-
-    addLocalSendBuffer(curTime, curLocation);
+    msg.data_size = sizeof(Ranging_Message_t);
 
     if (send(center_socket, &msg, sizeof(msg), 0) < 0) {
         perror("Send failed");
@@ -67,40 +57,37 @@ void *receive_from_center(void *arg) {
                 int random_value = ((rand() * 2654435761U) / getpid()) % 100;
 
                 if (random_value < PACKET_LOSS_RATE) {
-                    MessageWithLocation *modified_msg = (MessageWithLocation*)msg.data;
-                    Ranging_Message_t *ranging_msg = &modified_msg->rangingMessage;
+                    Ranging_Message_t *ranging_msg = (Ranging_Message_t*)msg.data;
                     printf("[QueueTaskRx]: message[%d] from %s dropped(rate = %d%%)\n",ranging_msg->header.msgSequence , msg.sender_id, PACKET_LOSS_RATE);
                     continue;
                 }
             #endif
 
-            if (msg.data_size != sizeof(MessageWithLocation)) {
+            if (msg.data_size != sizeof(Ranging_Message_t)) {
                 printf("Receiving failed, size of data_size does not match\n");
                 return NULL;
             }
 
-            MessageWithLocation *modified_msg = (MessageWithLocation*)msg.data;
+            Ranging_Message_t *ranging_msg = (Ranging_Message_t*)msg.data;
 
-            Ranging_Message_t *ranging_msg = &modified_msg->rangingMessage;
-
-            // get curTime and curLocation
+            // get curTime and localLocation
             #ifdef COORDINATE_SEND_ENABLE
-                Coordinate_Tuple_t curLocation = getCurrentLocation();
-                Coordinate_Tuple_t remoteLocation = modified_msg->location;
-                // printf("[local]:  x = %d, y = %d, z = %d\n[remote]: x = %d, y = %d, z = %d\n", curLocation.x, curLocation.y, curLocation.z, remoteLocation.x, remoteLocation.y, remoteLocation.z);
-                float distance = sqrt(pow((curLocation.x - remoteLocation.x), 2) + pow((curLocation.y - remoteLocation.y), 2) + pow((curLocation.z - remoteLocation.z), 2));
+                Coordinate_Tuple_t localLocation = getCurrentLocation();
+                Coordinate_Tuple_t remoteLocation = ranging_msg->header.TxCoordinate;
+                // printf("[local]:  x = %d, y = %d, z = %d\n[remote]: x = %d, y = %d, z = %d\n", localLocation.x, localLocation.y, localLocation.z, remoteLocation.x, remoteLocation.y, remoteLocation.z);
+                float distance = sqrt(pow((localLocation.x - remoteLocation.x), 2) + pow((localLocation.y - remoteLocation.y), 2) + pow((localLocation.z - remoteLocation.z), 2));
                 float Tof = (distance / 1000) / VELOCITY;
                 // printf("[%s -> %s][%d]: D = %f, TOF  = %f\n", msg.sender_id, local_drone_id, ranging_msg->header.msgSequence, distance, Tof);
                 local_sleep(Tof);
             #endif
 
-            uint64_t curTime = getCurrentTime();
+            uint64_t curTime = xTaskGetTickCount();
 
             Ranging_Message_With_Additional_Info_t full_info;
 
             full_info.rangingMessage = *ranging_msg;
-            full_info.RxTimestamp.full = curTime;
-            full_info.RxCoordinate = curLocation;
+            full_info.timestamp.full = curTime;
+            full_info.RxCoordinate = localLocation;
             
             // Rx
             // DEBUG_PRINT("[QueueTaskRx]: receive the message[%u] from %s at %llu\n", ranging_msg->header.msgSequence, msg.sender_id, curTime);
@@ -156,7 +143,7 @@ int main(int argc, char *argv[]) {
         local_drone_id, localHost->localAddress, localHost->location.x, localHost->location.y, localHost->location.z, localHost->velocity.x, localHost->velocity.y, localHost->velocity.z, localHost->randOffTime);
     initQueueTaskLock(&queueTaskLock);     
     DEBUG_PRINT("[initQueueTaskLock]: QueueTaskLock is ready\n");
-    initRangingTableSet();
+    rangingTableSetInit();
     DEBUG_PRINT("[initRangingTableSet]: RangingTableSet is ready\n");
 
     int center_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -215,11 +202,11 @@ int main(int argc, char *argv[]) {
 
     // main send loop
     while (1) {
-        // DEBUG_PRINT("[QueueTaskTx]: send the message[%u] from %s at %llu\n", localSendSeqNumber, local_drone_id, getCurrentTime());
+        // DEBUG_PRINT("[QueueTaskTx]: send the message[%u] from %s at %llu\n", rangingTableSet->localSeqNumber, local_drone_id, xTaskGetTickCount());
         Time_t time_delay = QueueTaskTx(&queueTaskLock, MESSAGE_SIZE, send_to_center, center_socket, local_drone_id);
         
         #ifdef ALIGN_ENABLE
-            if(localSendSeqNumber > ALIGN_ROUNDS) {
+            if(rangingTableSet->localSeqNumber > ALIGN_ROUNDS) {
                 modifyLocation(time_delay);
             }
         #else

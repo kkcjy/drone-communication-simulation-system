@@ -109,7 +109,7 @@ typedef struct {
     SendList_t sendList;                                    // timestamps of messages sent to neighbors
     Ranging_Table_t rangingTable[RANGING_TABLE_SIZE];
     Timestamp_Tuple_t lastRxtimestamp[RANGING_TABLE_SIZE];  
-    index_t prorityQueue[RANGING_TABLE_SIZE];               // used for choosing neighbors to send messages
+    index_t priorityQueue[RANGING_TABLE_SIZE];               // used for choosing neighbors to send messages
 } __attribute__((packed)) Ranging_Table_Set_t;
 
 
@@ -118,13 +118,20 @@ typedef enum {
     SECOND_CALCULATE
 } CalculateState;
 
+typedef enum {
+    INIT,
+    CORRECT
+} CalculateMode;
+
 
 void rangingTableInit(Ranging_Table_t *rangingTable);
 table_index_t registerRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t address);
 table_index_t findRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t address);
 void shiftRangingTable(Ranging_Table_t *rangingTable);
 void fillRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, Timestamp_Tuple_t Rx, Timestamp_Tuple_t Tn, Timestamp_Tuple_t Rn, Timestamp_Tuple_t Rr, float Tof);
-float assistedCalculateTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, Timestamp_Tuple_t Rx, Timestamp_Tuple_t Tn, Timestamp_Tuple_t Rn);
+float assistedCalculateTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, Timestamp_Tuple_t Rx, Timestamp_Tuple_t Tn, Timestamp_Tuple_t Rn, CalculateMode mode);
 float calculateTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, Timestamp_Tuple_t Rx, Timestamp_Tuple_t Tn, Timestamp_Tuple_t Rn, CalculateState state);
+void printRangingMessage(Ranging_Message_t *rangingMessage);
+
 
 #endif

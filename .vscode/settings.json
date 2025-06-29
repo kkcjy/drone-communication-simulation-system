@@ -10,6 +10,9 @@
         "ranging_local_support.h": "c",
         "stdio.h": "c",
         "local_host.h": "c",
-        "stdbool.h": "c"
+        "stdbool.h": "c",
+        "array": "c",
+        "string": "c",
+        "string_view": "c"
     }
 }
