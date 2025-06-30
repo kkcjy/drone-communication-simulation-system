@@ -8,9 +8,6 @@ extern Local_Host_t *localHost;
 extern Ranging_Table_Set_t* rangingTableSet;     
 extern int RangingPeriod;
 QueueTaskLock_t queueTaskLock;                  // lock for task
-#ifdef DYNAMIC_RANGING_FREQUENCY_ENABLE
-    int safeRoundCounter = 0;                   // counter for safe distance
-#endif
 
 
 void send_to_center(int center_socket, const char* node_id, const Ranging_Message_t* ranging_msg) {
@@ -100,29 +97,7 @@ void *receive_from_center(void *arg) {
 // for processing
 void *process_messages(void *arg) {
     while (1) {
-        #ifdef DYNAMIC_RANGING_FREQUENCY_ENABLE
-            bool unSafe = processFromQueue(&queueTaskLock);
-            /*
-                unsafe -> set RANGING_PERIOD_LOW
-                safe more than SAFE_DISTANCE_ROUND_BORDER -> set RANGING_PERIOD
-            */
-            if (unSafe) {
-                RangingPeriod = RANGING_PERIOD_LOW;
-                safeRoundCounter = 0;
-                printf("Warning: Unsafe condition detected!\n");
-            }
-            else {
-                safeRoundCounter++;
-                if(safeRoundCounter == SAFE_DISTANCE_ROUND_BORDER) {
-                    RangingPeriod = RANGING_PERIOD;
-                }
-            }
-        #else
-            processFromQueue(&queueTaskLock);
-        #endif
-        
-        // printRangingTableSet();
-
+        processFromQueue(&queueTaskLock);
         local_sleep(10);                      
     }
     return NULL;

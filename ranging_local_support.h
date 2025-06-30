@@ -30,10 +30,6 @@ typedef         uint32_t                    Time_t;
 // MODE_ENABLE
 // #define         COMPENSATE_ENABLE                               // enable compensate for ranging
 
-// // #define         DYNAMIC_RANGING_FREQUENCY_ENABLE                // enable dynamic ranging frequency
-// #define         SAFE_DISTANCE               2000                // distance < SAFE_DISTANCE -> RANGING_PERIOD_LOW
-// #define         SAFE_DISTANCE_ROUND_BORDER  2                   // distance > SAFE_DISTANCE more than SAFE_DISTANCE_ROUND_BORDER times -> RANGING_PERIOD
-
 // // #define         RANDOM_DIFF_TIME_ENABLE                         // enable diff(0 ~ MAX_RANDOM_TIME_OFF) time between drones
 // #define         MAX_RANDOM_TIME_OFF         10                  // upon of diff time between drones
 

@@ -265,13 +265,14 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
                     initTof = assistedCalculateTof(&tmpRangingTable, rangingTable->T4, rangingTable->R4, Tx, Rx, INIT);
                 }
                     if(initTof == NULL_TOF) {
-                    initTof = rangingTable->Tof;
+                    initTof = rangingTable->PTof;
                 }
             }
         }
 
         if(initTof != NULL_TOF) {
-            DEBUG_PRINT("[current_%u]: ModifiedD = %f, ClassicD = %f", MY_UWB_ADDRESS, initTof, initTof);
+            float initD = (initTof * VELOCITY) / 2;
+            DEBUG_PRINT("[current_%u]: ModifiedD = %f, ClassicD = %f", MY_UWB_ADDRESS, initD, initD);
             #ifdef COORDINATE_SEND_ENABLE
                 DEBUG_PRINT(", TrueD = %f\n", TrueD);
             #else
@@ -291,10 +292,11 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
         +------+------+------+------+------+------+------+
     */
     else {
-        float Tof = calculateTof(rangingTable, Tx, Rx, Tn, Rn, FIRST_CALCULATE);
-        if(Tof != NULL_TOF) {
+        // modified protocol
+        float ModifiedTof = calculateTof(rangingTable, Tx, Rx, Tn, Rn, FIRST_CALCULATE);
+        if(ModifiedTof != NULL_TOF) {
             shiftRangingTable(rangingTable);
-            fillRangingTable(rangingTable, Tx, Rx, Tn, Rn, Rr, Tof);
+            fillRangingTable(rangingTable, Tx, Rx, Tn, Rn, Rr, ModifiedTof);
         }
 
         // calculation failed
@@ -307,7 +309,7 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
                 tmpRangingTable.R3 = rangingTable->R1;
                 tmpRangingTable.T4 = rangingTable->T2;
                 tmpRangingTable.R4 = rangingTable->R2;
-                Tof = calculateTof(&tmpRangingTable, rangingTable->T3, rangingTable->R3, Tn, Rn, SECOND_CALCULATE);
+                ModifiedTof = calculateTof(&tmpRangingTable, rangingTable->T3, rangingTable->R3, Tn, Rn, SECOND_CALCULATE);
             }
             // Tx and Rx are full
             else if(Tx.seqNumber != NULL_SEQ && Rx.seqNumber != NULL_SEQ) {
@@ -316,14 +318,38 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
                 tmpRangingTable.R3 = rangingTable->R2;
                 tmpRangingTable.T4 = rangingTable->T3;
                 tmpRangingTable.R4 = rangingTable->R3;
-                Tof = calculateTof(&tmpRangingTable, rangingTable->T4, rangingTable->R4, Tx, Rx, SECOND_CALCULATE);
+                ModifiedTof = calculateTof(&tmpRangingTable, rangingTable->T4, rangingTable->R4, Tx, Rx, SECOND_CALCULATE);
             }
-            if(Tof == NULL_TOF) {
-                Tof = rangingTable->Tof;
+            if(ModifiedTof == NULL_TOF) {
+                ModifiedTof = rangingTable->PTof;
             }
         }
-        if(Tof != NULL_TOF) {
-            DEBUG_PRINT("[current_%u]: ModifiedD = %f, ClassicD = %f", MY_UWB_ADDRESS, Tof, Tof);
+        if(ModifiedTof != NULL_TOF) {
+            // classic protocol
+            float ClassicTof = assistedCalculateTof(rangingTable, Tx, Rx, Tn, Rn, INIT);
+
+            // Tn and Rn are full
+            if(Tn.seqNumber != NULL_SEQ && Rn.seqNumber != NULL_SEQ) {
+                Ranging_Table_t tmpRangingTable;
+                tmpRangingTable.T4 = rangingTable->T2;
+                tmpRangingTable.R4 = rangingTable->R2;
+                ClassicTof = assistedCalculateTof(&tmpRangingTable, rangingTable->T3, rangingTable->R3, Tn, Rn, INIT);
+            }
+            // Tx and Rx are full
+            else if(Tx.seqNumber != NULL_SEQ && Rx.seqNumber != NULL_SEQ) {
+                Ranging_Table_t tmpRangingTable;
+                tmpRangingTable.T4 = rangingTable->T3;
+                tmpRangingTable.R4 = rangingTable->R3;
+                ClassicTof = assistedCalculateTof(&tmpRangingTable, rangingTable->T4, rangingTable->R4, Tx, Rx, INIT);
+            }
+            if(ClassicTof == NULL_TOF) {
+                ClassicTof = rangingTable->PTof;
+            }
+            
+            // PTof = T23 = T2 + T3
+            float ModifiedD = (ModifiedTof * VELOCITY) / 2;
+            float ClassicD = (ClassicTof * VELOCITY) / 2;
+            DEBUG_PRINT("[current_%u]: ModifiedD = %f, ClassicD = %f", MY_UWB_ADDRESS, ModifiedD, ClassicD);
             #ifdef COORDINATE_SEND_ENABLE
                 DEBUG_PRINT(", TrueD = %f\n", TrueD);
             #else

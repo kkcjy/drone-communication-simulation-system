@@ -25,6 +25,6 @@ typedef void (*SendFunction)(int, const char*, const Ranging_Message_t *);
 void initQueueTaskLock(QueueTaskLock_t *queue);
 Time_t QueueTaskTx(QueueTaskLock_t *queue, int msgSize, SendFunction send_to_center, int centerSocket, const char* droneId);
 void QueueTaskRx(QueueTaskLock_t *queue, void *data, size_t data_size);
-bool processFromQueue(QueueTaskLock_t *queue);
+void processFromQueue(QueueTaskLock_t *queue);
 
 #endif

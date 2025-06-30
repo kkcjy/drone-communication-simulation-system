@@ -73,14 +73,14 @@ typedef struct {
 
 /* Ranging Table
     +------+------+------+------+------+------+
-    |  T1  |  R2  |  T3  |  R4  | PTof |  Tof |
+    |  T1  |  R2  |  T3  |  R4  | EPTof| PTof |
     +------+------+------+------+------+------+
     |  R1  |  T2  |  R3  |  T4  |  Rx  | flag |
     +------+------+------+------+------+------+
-    Note:       1. PTof = Tof1 + Tof2 = Tof12
-                2. Tof = Tof3 + Tof4 = Tof34
-    Calculate:  1. Tof12 -> Tof23 -> Tof34 => Tof = Tof34 / 2
-                2. Tof12 -> Tof23 -> Tof34 => Tof = (Tof23 + Tof34) / 4 + Compensate
+    Note:       1. EPTof = Tof1 + Tof2 = Tof12
+                2. PTof = Tof3 + Tof4 = Tof34
+    Calculate:  1. Tof12 -> Tof23 -> Tof34 => PTof = Tof34 / 2
+                2. Tof12 -> Tof23 -> Tof34 => PTof = (Tof23 + Tof34) / 4 + Compensate
 */
 typedef struct {
     uint16_t neighborAddress;
@@ -95,8 +95,8 @@ typedef struct {
     Timestamp_Tuple_t R4;
     Timestamp_Tuple_t Rx;               // last timestamp of message received from neighbor
 
-    float Tof;
-    float PTof;
+    float PTof;                         // pair of Tof
+    float EPTof;                        // early pair of Tof
 
     bool flag;                          // true: contiguous, false: non-contiguous
 
@@ -128,14 +128,15 @@ void rangingTableInit(Ranging_Table_t *rangingTable);
 table_index_t registerRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t address);
 table_index_t findRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t address);
 void shiftRangingTable(Ranging_Table_t *rangingTable);
-void fillRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, Timestamp_Tuple_t Rx, Timestamp_Tuple_t Tn, Timestamp_Tuple_t Rn, Timestamp_Tuple_t Rr, float Tof);
+void fillRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, Timestamp_Tuple_t Rx, Timestamp_Tuple_t Tn, Timestamp_Tuple_t Rn, Timestamp_Tuple_t Rr, float PTof);
 float assistedCalculateTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, Timestamp_Tuple_t Rx, Timestamp_Tuple_t Tn, Timestamp_Tuple_t Rn, CalculateMode mode);
 float calculateTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, Timestamp_Tuple_t Rx, Timestamp_Tuple_t Tn, Timestamp_Tuple_t Rn, CalculateState state);
 void printRangingMessage(Ranging_Message_t *rangingMessage);
-void printPriorityQueue(Ranging_Table_Set_t *rangingTableSet);
+void printPriorityQueue(Ranging_Table_Set_t *rngingTableSet);
 void printSendList(SendList_t *sendList);
 void printRangingTable(Ranging_Table_t *rangingTable);
 void printRangingTableSet(Ranging_Table_Set_t *rangingTableSet);
+void printAssistedCalculateTuple(Timestamp_Tuple_t Tp, Timestamp_Tuple_t Rp, Timestamp_Tuple_t Tx, Timestamp_Tuple_t Rx, Timestamp_Tuple_t Tn, Timestamp_Tuple_t Rn);
 
 
 #endif

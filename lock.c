@@ -72,7 +72,7 @@ void QueueTaskRx(QueueTaskLock_t *queue, void *data, size_t data_size) {
 }
 
 // process
-bool processFromQueue(QueueTaskLock_t *queue) {
+void processFromQueue(QueueTaskLock_t *queue) {
 GET:
 
     pthread_mutex_lock(&queue->mutex);
@@ -89,12 +89,7 @@ GET:
 PROCESS:
     Ranging_Message_With_Additional_Info_t *rangingMessageWithAdditionalInfo = (Ranging_Message_With_Additional_Info_t*)queue->queueTask[queue->head].data;
 
-    #ifdef DYNAMIC_RANGING_FREQUENCY_ENABLE
-        // distance < SAFE_DISTANCE -> unsafe
-        bool unSafe = processMessage(rangingMessageWithAdditionalInfo);
-    #else
-        processMessage(rangingMessageWithAdditionalInfo);
-    #endif
+    processMessage(rangingMessageWithAdditionalInfo);
 
     free(queue->queueTask[queue->head].data);
     queue->queueTask[queue->head].data = NULL;
@@ -104,10 +99,4 @@ PROCESS:
     pthread_mutex_unlock(&queue->countMutex);
 
     pthread_mutex_unlock(&queue->mutex);
-
-    #ifdef DYNAMIC_RANGING_FREQUENCY_ENABLE
-        return unSafe;
-    #else
-        return false;
-    #endif
 }
