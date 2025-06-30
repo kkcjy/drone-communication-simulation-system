@@ -54,16 +54,11 @@ void *handle_node_connection(void *arg) {
     }
     pthread_mutex_unlock(&nodes_mutex);
 
+    // broadcast received message to all nodes
     NodeMessage msg;
     while ((bytes_received = recv(node_socket, &msg, sizeof(msg), 0)) > 0) {
-        // Print function
         Ranging_Message_t *ranging_msg = (Ranging_Message_t*)msg.data;
-        // printf("\n********************[%s]********************\n", node_id);
-        // printRangingMessage(ranging_msg);
-        // printf("********************[%s]********************\n", node_id);
         printf("broadcast [%s], address = %d, msgSeq = %d, time = %ld\n", node_id, ranging_msg->header.srcAddress, ranging_msg->header.msgSequence, get_current_milliseconds() - worldBaseTime);
-
-        // Immediately broadcast received message to all nodes
         broadcast_to_nodes(&msg);
     }
 

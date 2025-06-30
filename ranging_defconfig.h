@@ -6,7 +6,7 @@
 
 
 #define         NULL_ADDR                   0xFFFF
-#define         NULL_SEQ                    0xFFFF
+#define         NULL_SEQ                    0x0
 #define         NULL_TIMESTAMP              0xFFFFFFFFU
 #define         NULL_INDEX                  0xFF
 #define         NULL_TOF                    -1.0f
@@ -15,7 +15,7 @@
 #define         index_t                     uint8_t
 
 #define         MESSAGE_TX_POOL_SIZE        3
-#define         MESSAGE_BODY_UNIT_SIZE      10
+#define         MESSAGE_BODY_UNIT_SIZE      2
 
 #define         SEND_LIST_SIZE              5
 #define         RANGING_TABLE_SIZE          10                

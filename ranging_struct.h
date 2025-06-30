@@ -132,6 +132,10 @@ void fillRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, Times
 float assistedCalculateTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, Timestamp_Tuple_t Rx, Timestamp_Tuple_t Tn, Timestamp_Tuple_t Rn, CalculateMode mode);
 float calculateTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, Timestamp_Tuple_t Rx, Timestamp_Tuple_t Tn, Timestamp_Tuple_t Rn, CalculateState state);
 void printRangingMessage(Ranging_Message_t *rangingMessage);
+void printPriorityQueue(Ranging_Table_Set_t *rangingTableSet);
+void printSendList(SendList_t *sendList);
+void printRangingTable(Ranging_Table_t *rangingTable);
+void printRangingTableSet(Ranging_Table_Set_t *rangingTableSet);
 
 
 #endif

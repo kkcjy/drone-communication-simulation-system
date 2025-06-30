@@ -9,6 +9,8 @@ static int8_t initCalculateRound = 0;
 
 
 void rangingTableSetInit() {
+    MY_UWB_ADDRESS = uwbGetAddress();
+
     rangingTableSet = (Ranging_Table_Set_t *)malloc(sizeof(Ranging_Table_Set_t));
     rangingTableSet->counter = 0;
     rangingTableSet->localSeqNumber = NULL_SEQ;
@@ -126,7 +128,7 @@ Time_t generateMessage(Ranging_Message_t *rangingMessage) {
     rangingMessage->header.msgSequence = rangingTableSet->localSeqNumber;
     index_t index_Tx = rangingTableSet->sendList.topIndex;
     for(int i = 0; i < MESSAGE_TX_POOL_SIZE; i++) {
-        if(rangingTableSet->sendList.Txtimestamps[index_Tx].timestamp.full != NULL_TIMESTAMP) {
+        if(rangingTableSet->sendList.Txtimestamps[index_Tx].seqNumber != NULL_SEQ) {
             rangingMessage->header.Txtimestamps[i] = rangingTableSet->sendList.Txtimestamps[index_Tx];
             index_Tx = (index_Tx - 1 + SEND_LIST_SIZE) % SEND_LIST_SIZE;
         }
@@ -156,7 +158,7 @@ Time_t generateMessage(Ranging_Message_t *rangingMessage) {
 void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAdditionalInfo) {
     Ranging_Message_t *rangingMessage = &rangingMessageWithAdditionalInfo->rangingMessage;
 
-    printRangingMessage(rangingMessage);
+    // printRangingMessage(rangingMessage);
 
     uint16_t neighborAddress = rangingMessage->header.srcAddress;
     index_t neighborIndex = findRangingTable(rangingTableSet, neighborAddress);
@@ -174,8 +176,6 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
         updatePriority(rangingTableSet, neighborAddress);
     }
 
-    printPriorityQueue();
-
     Ranging_Table_t *rangingTable = &rangingTableSet->rangingTable[neighborIndex];
 
     Timestamp_Tuple_t Rr;
@@ -183,9 +183,12 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
     Rr.seqNumber = rangingMessage->header.msgSequence;
     
     #ifdef COORDINATE_SEND_ENABLE
-        Coordinate_Tuple_t Txcoordinate = rangingMessage->header.TxCoordinate;
+        Coordinate_Tuple_t TxCoordinate = rangingMessage->header.TxCoordinate;
         Coordinate_Tuple_t RxCoordinate = rangingMessageWithAdditionalInfo->RxCoordinate;
-        float TrueD = sqrt(pow(RxCoordinate.x - Txcoordinate.x, 2) + pow(RxCoordinate.y - Txcoordinate.y, 2) + pow(RxCoordinate.z - Txcoordinate.z, 2));
+        float TrueDx = (RxCoordinate.x - TxCoordinate.x);
+        float TrueDy = (RxCoordinate.y - TxCoordinate.y);
+        float TrueDz = (RxCoordinate.z - TxCoordinate.z);
+        float TrueD = sqrtf(TrueDx * TrueDx + TrueDy * TrueDy + TrueDz * TrueDz) / 1000;
     #endif
 
     /* process bodyUnit */
@@ -248,14 +251,14 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
             // data loss caused by lossing packet ---> calculate
             else {
                 // Tn and Rn are full
-                if(Tn.timestamp.full != NULL_TIMESTAMP && Rn.timestamp.full != NULL_TIMESTAMP) {
+                if(Tn.seqNumber != NULL_SEQ && Rn.seqNumber != NULL_SEQ) {
                     Ranging_Table_t tmpRangingTable;
                     tmpRangingTable.T4 = rangingTable->T2;
                     tmpRangingTable.R4 = rangingTable->R2;
                     initTof = assistedCalculateTof(&tmpRangingTable, rangingTable->T3, rangingTable->R3, Tn, Rn, INIT);
                 }
                 // Tx and Rx are full
-                else if(Tx.timestamp.full != NULL_TIMESTAMP && Rx.timestamp.full != NULL_TIMESTAMP) {
+                else if(Tx.seqNumber != NULL_SEQ && Rx.seqNumber != NULL_SEQ) {
                     Ranging_Table_t tmpRangingTable;
                     tmpRangingTable.T4 = rangingTable->T3;
                     tmpRangingTable.R4 = rangingTable->R3;
@@ -298,7 +301,7 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
         else {
             // data loss caused by lossing packet ---> calculate
             // Tn and Rn are full
-            if(Tn.timestamp.full != NULL_TIMESTAMP && Rn.timestamp.full != NULL_TIMESTAMP) {
+            if(Tn.seqNumber != NULL_SEQ && Rn.seqNumber != NULL_SEQ) {
                 Ranging_Table_t tmpRangingTable;
                 tmpRangingTable.T3 = rangingTable->T1;
                 tmpRangingTable.R3 = rangingTable->R1;
@@ -307,7 +310,7 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
                 Tof = calculateTof(&tmpRangingTable, rangingTable->T3, rangingTable->R3, Tn, Rn, SECOND_CALCULATE);
             }
             // Tx and Rx are full
-            else if(Tx.timestamp.full != NULL_TIMESTAMP && Rx.timestamp.full != NULL_TIMESTAMP) {
+            else if(Tx.seqNumber != NULL_SEQ && Rx.seqNumber != NULL_SEQ) {
                 Ranging_Table_t tmpRangingTable;
                 tmpRangingTable.T3 = rangingTable->T2;
                 tmpRangingTable.R3 = rangingTable->R2;
@@ -331,13 +334,5 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
             DEBUG_PRINT("Warning: CalculateTof failed\n");
         }
     }
-
-}
-
-void printPriorityQueue() {
-    DEBUG_PRINT("\n{priorityQueue}\n");
-    for(int i = 0; i < rangingTableSet->counter; i++) {
-        DEBUG_PRINT("%d - %u\n", i + 1, rangingTableSet->rangingTable[rangingTableSet->priorityQueue[i]].neighborAddress);
-    }
-    DEBUG_PRINT("\n");
+    printRangingTableSet(rangingTableSet);
 }
