@@ -228,8 +228,9 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
         |  T4  |  Rx  |  Tn  |  Rr  |
         +------+------+------+------+
     */
+    // classic protocol
     if(initCalculateRound < INIT_CALCULATION_ROUNDS) {
-        float initTof = assistedCalculateTof(rangingTable, Tx, Rx, Tn, Rn, INIT);
+        float initTof = assistedCalculateTof(rangingTable, Tx, Rx, Tn, Rn);
 
         if(initTof != NULL_TOF) {
             initCalculateRound++;
@@ -242,29 +243,46 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
 
         // initCalculation failed
         else {
+            DEBUG_PRINT("[initCalculateTof]: calculate failed, ");
             // data loss caused by initializing   ---> update
             if(initCalculateRound == 0) {
+                DEBUG_PRINT("caused by initializing --> update rangingTable\n");
                 shiftRangingTable(rangingTable);
                 fillRangingTable(rangingTable, Tx, Rx, Tn, Rn, Rr, NULL_TOF);
             }
 
-            // data loss caused by lossing packet ---> calculate
+            // data loss caused by lossing packet ---> recalculate
             else {
-                // Tn and Rn are full
+                DEBUG_PRINT("caused by lossing packet ---> recalculate\n");
+                /* Tn and Rn are full  =>  using T2, R2, T3, R3, Tn, Rn
+                +------+------+------+------+------+
+                |  R2  |  T3  |  R4  |      |  Rn  |
+                +------+------+------+------+------+------+
+                |  T2  |  R3  |  T4  |      |  Tn  |  Rr  |
+                +------+------+------+------+------+------+
+                */
                 if(Tn.seqNumber != NULL_SEQ && Rn.seqNumber != NULL_SEQ) {
                     Ranging_Table_t tmpRangingTable;
                     tmpRangingTable.T4 = rangingTable->T2;
                     tmpRangingTable.R4 = rangingTable->R2;
-                    initTof = assistedCalculateTof(&tmpRangingTable, rangingTable->T3, rangingTable->R3, Tn, Rn, INIT);
+                    initTof = assistedCalculateTof(&tmpRangingTable, rangingTable->T3, rangingTable->R3, Tn, Rn);
                 }
-                // Tx and Rx are full
+                /* Tx and Rx are full  =>  using T3, R3, T4, R4, Tx, Rx
+                +------+------+------+------+------+
+                |  R2  |  T3  |  R4  |  Tx  |      |
+                +------+------+------+------+------+------+
+                |  T2  |  R3  |  T4  |  Rx  |      |  Rr  |
+                +------+------+------+------+------+------+
+                */
                 else if(Tx.seqNumber != NULL_SEQ && Rx.seqNumber != NULL_SEQ) {
                     Ranging_Table_t tmpRangingTable;
                     tmpRangingTable.T4 = rangingTable->T3;
                     tmpRangingTable.R4 = rangingTable->R3;
-                    initTof = assistedCalculateTof(&tmpRangingTable, rangingTable->T4, rangingTable->R4, Tx, Rx, INIT);
+                    initTof = assistedCalculateTof(&tmpRangingTable, rangingTable->T4, rangingTable->R4, Tx, Rx);
                 }
-                    if(initTof == NULL_TOF) {
+                // recalculation failed, use the Tof calculated last time
+                if(initTof == NULL_TOF) {
+                    DEBUG_PRINT("[initCalculateTof]: recalculate failed");
                     initTof = rangingTable->PTof;
                 }
             }
@@ -274,10 +292,9 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
             float initD = (initTof * VELOCITY) / 2;
             DEBUG_PRINT("[current_%u]: ModifiedD = %f, ClassicD = %f", MY_UWB_ADDRESS, initD, initD);
             #ifdef COORDINATE_SEND_ENABLE
-                DEBUG_PRINT(", TrueD = %f\n", TrueD);
-            #else
-                DEBUG_PRINT("\n");
+                DEBUG_PRINT(", TrueD = %f", TrueD);
             #endif
+            DEBUG_PRINT(", time = %llu\n", Rr.timestamp.full);
         }
         else {
             DEBUG_PRINT("Warning: assistedCalculateTof failed\n");
@@ -291,9 +308,10 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
         |  R1  |  T2  |  R3  |  T4  |  Rx  |  Tn  |  Rr  |
         +------+------+------+------+------+------+------+
     */
+    // modified protocol
     else {
-        // modified protocol
         float ModifiedTof = calculateTof(rangingTable, Tx, Rx, Tn, Rn, FIRST_CALCULATE);
+
         if(ModifiedTof != NULL_TOF) {
             shiftRangingTable(rangingTable);
             fillRangingTable(rangingTable, Tx, Rx, Tn, Rn, Rr, ModifiedTof);
@@ -301,8 +319,15 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
 
         // calculation failed
         else {
-            // data loss caused by lossing packet ---> calculate
-            // Tn and Rn are full
+            DEBUG_PRINT("[modifiedCalculateTof]: calculate failed, caused by lossing packet ---> recalculate\n");
+            // data loss caused by lossing packet ---> recalculate
+            /* Tn and Rn are full  =>  using T1, R1, T2, R2, T3, R3, Tn, Rn
+            +------+------+------+------+------+------+
+            |  T1  |  R2  |  T3  |  R4  |      |  Rn  |
+            +------+------+------+------+------+------+------+
+            |  R1  |  T2  |  R3  |  T4  |      |  Tn  |  Rr  |
+            +------+------+------+------+------+------+------+
+            */
             if(Tn.seqNumber != NULL_SEQ && Rn.seqNumber != NULL_SEQ) {
                 Ranging_Table_t tmpRangingTable;
                 tmpRangingTable.T3 = rangingTable->T1;
@@ -311,7 +336,13 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
                 tmpRangingTable.R4 = rangingTable->R2;
                 ModifiedTof = calculateTof(&tmpRangingTable, rangingTable->T3, rangingTable->R3, Tn, Rn, SECOND_CALCULATE);
             }
-            // Tx and Rx are full
+            /* Tx and Rx are full  =>  using T2, R2, T3, R3, T4, R4, Tx, Rx
+            +------+------+------+------+------+------+
+            |  T1  |  R2  |  T3  |  R4  |  Tx  |      |
+            +------+------+------+------+------+------+------+
+            |  R1  |  T2  |  R3  |  T4  |  Rx  |      |  Rr  |
+            +------+------+------+------+------+------+------+
+            */
             else if(Tx.seqNumber != NULL_SEQ && Rx.seqNumber != NULL_SEQ) {
                 Ranging_Table_t tmpRangingTable;
                 tmpRangingTable.T3 = rangingTable->T2;
@@ -320,30 +351,49 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
                 tmpRangingTable.R4 = rangingTable->R3;
                 ModifiedTof = calculateTof(&tmpRangingTable, rangingTable->T4, rangingTable->R4, Tx, Rx, SECOND_CALCULATE);
             }
+            // recalculation failed, use the Tof calculated last time
             if(ModifiedTof == NULL_TOF) {
+                DEBUG_PRINT("[modifiedCalculateTof]: recalculate failed");
                 ModifiedTof = rangingTable->PTof;
             }
         }
         if(ModifiedTof != NULL_TOF) {
             // classic protocol
-            float ClassicTof = assistedCalculateTof(rangingTable, Tx, Rx, Tn, Rn, INIT);
+            float ClassicTof = assistedCalculateTof(rangingTable, Tx, Rx, Tn, Rn);
 
-            // Tn and Rn are full
-            if(Tn.seqNumber != NULL_SEQ && Rn.seqNumber != NULL_SEQ) {
-                Ranging_Table_t tmpRangingTable;
-                tmpRangingTable.T4 = rangingTable->T2;
-                tmpRangingTable.R4 = rangingTable->R2;
-                ClassicTof = assistedCalculateTof(&tmpRangingTable, rangingTable->T3, rangingTable->R3, Tn, Rn, INIT);
-            }
-            // Tx and Rx are full
-            else if(Tx.seqNumber != NULL_SEQ && Rx.seqNumber != NULL_SEQ) {
-                Ranging_Table_t tmpRangingTable;
-                tmpRangingTable.T4 = rangingTable->T3;
-                tmpRangingTable.R4 = rangingTable->R3;
-                ClassicTof = assistedCalculateTof(&tmpRangingTable, rangingTable->T4, rangingTable->R4, Tx, Rx, INIT);
-            }
             if(ClassicTof == NULL_TOF) {
-                ClassicTof = rangingTable->PTof;
+                DEBUG_PRINT("[classicCalculateTof]: calculate failed, caused by lossing packet ---> recalculate\n");
+                /* Tn and Rn are full  =>  using T2, R2, T3, R3, Tn, Rn
+                +------+------+------+------+------+
+                |  R2  |  T3  |  R4  |      |  Rn  |
+                +------+------+------+------+------+------+
+                |  T2  |  R3  |  T4  |      |  Tn  |  Rr  |
+                +------+------+------+------+------+------+
+                */
+                if(Tn.seqNumber != NULL_SEQ && Rn.seqNumber != NULL_SEQ) {
+                    Ranging_Table_t tmpRangingTable;
+                    tmpRangingTable.T4 = rangingTable->T2;
+                    tmpRangingTable.R4 = rangingTable->R2;
+                    ClassicTof = assistedCalculateTof(&tmpRangingTable, rangingTable->T3, rangingTable->R3, Tn, Rn);
+                }
+                /* Tx and Rx are full  =>  using T3, R3, T4, R4, Tx, Rx
+                +------+------+------+------+------+
+                |  R2  |  T3  |  R4  |  Tx  |      |
+                +------+------+------+------+------+------+
+                |  T2  |  R3  |  T4  |  Rx  |      |  Rr  |
+                +------+------+------+------+------+------+
+                */
+                else if(Tx.seqNumber != NULL_SEQ && Rx.seqNumber != NULL_SEQ) {
+                    Ranging_Table_t tmpRangingTable;
+                    tmpRangingTable.T4 = rangingTable->T3;
+                    tmpRangingTable.R4 = rangingTable->R3;
+                    ClassicTof = assistedCalculateTof(&tmpRangingTable, rangingTable->T4, rangingTable->R4, Tx, Rx);
+                }
+                // recalculation failed, use the Tof calculated last time
+                if(ClassicTof == NULL_TOF) {
+                    DEBUG_PRINT("[classicCalculateTof]: recalculate failed\n");
+                    ClassicTof = rangingTable->PTof;
+                }
             }
             
             // PTof = T23 = T2 + T3
@@ -351,10 +401,9 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
             float ClassicD = (ClassicTof * VELOCITY) / 2;
             DEBUG_PRINT("[current_%u]: ModifiedD = %f, ClassicD = %f", MY_UWB_ADDRESS, ModifiedD, ClassicD);
             #ifdef COORDINATE_SEND_ENABLE
-                DEBUG_PRINT(", TrueD = %f\n", TrueD);
-            #else
-                DEBUG_PRINT("\n");
+                DEBUG_PRINT(", TrueD = %f", TrueD);
             #endif
+            DEBUG_PRINT(", time = %llu\n", Rr.timestamp.full);
         }
         else {
             DEBUG_PRINT("Warning: CalculateTof failed\n");

@@ -118,18 +118,13 @@ typedef enum {
     SECOND_CALCULATE
 } CalculateState;
 
-typedef enum {
-    INIT,
-    CORRECT
-} CalculateMode;
-
 
 void rangingTableInit(Ranging_Table_t *rangingTable);
 table_index_t registerRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t address);
 table_index_t findRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t address);
 void shiftRangingTable(Ranging_Table_t *rangingTable);
 void fillRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, Timestamp_Tuple_t Rx, Timestamp_Tuple_t Tn, Timestamp_Tuple_t Rn, Timestamp_Tuple_t Rr, float PTof);
-float assistedCalculateTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, Timestamp_Tuple_t Rx, Timestamp_Tuple_t Tn, Timestamp_Tuple_t Rn, CalculateMode mode);
+float assistedCalculateTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, Timestamp_Tuple_t Rx, Timestamp_Tuple_t Tn, Timestamp_Tuple_t Rn);
 float calculateTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, Timestamp_Tuple_t Rx, Timestamp_Tuple_t Tn, Timestamp_Tuple_t Rn, CalculateState state);
 void printRangingMessage(Ranging_Message_t *rangingMessage);
 void printPriorityQueue(Ranging_Table_Set_t *rngingTableSet);
@@ -137,6 +132,7 @@ void printSendList(SendList_t *sendList);
 void printRangingTable(Ranging_Table_t *rangingTable);
 void printRangingTableSet(Ranging_Table_Set_t *rangingTableSet);
 void printAssistedCalculateTuple(Timestamp_Tuple_t Tp, Timestamp_Tuple_t Rp, Timestamp_Tuple_t Tx, Timestamp_Tuple_t Rx, Timestamp_Tuple_t Tn, Timestamp_Tuple_t Rn);
+void printCalculateTuple(Timestamp_Tuple_t T1, Timestamp_Tuple_t R1, Timestamp_Tuple_t T2, Timestamp_Tuple_t R2, Timestamp_Tuple_t T3, Timestamp_Tuple_t R3, Timestamp_Tuple_t T4, Timestamp_Tuple_t R4);
 
 
 #endif

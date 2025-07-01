@@ -102,8 +102,9 @@ void fillRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, Times
             Ranging_Table_t correctRangingTable;
             correctRangingTable.T4 = rangingTable->T2;
             correctRangingTable.R4 = rangingTable->R2;
-            float correctTof = assistedCalculateTof(&correctRangingTable, Tx, Rx, Tn, Rn, CORRECT);
+            float correctTof = assistedCalculateTof(&correctRangingTable, Tx, Rx, Tn, Rn);
             rangingTable->PTof = correctTof;
+            DEBUG_PRINT("[correct PTof]: correct PTof = %f\n", correctTof);
         }
     }
     else if(rangingTable->R3.seqNumber + 1 != rangingTable->Rx.seqNumber){
@@ -115,11 +116,8 @@ void fillRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, Times
        Rp   <--Db-->    Tx      <--Rb-->       Rn
 
     Tp      <--Ra-->      Rx    <--Da-->    Tn
-
-    INIT mode:      data should be in order
-    CORRECT mode:   data should be strictly contigurous and in order
 */ 
-float assistedCalculateTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, Timestamp_Tuple_t Rx, Timestamp_Tuple_t Tn, Timestamp_Tuple_t Rn, CalculateMode mode) {
+float assistedCalculateTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, Timestamp_Tuple_t Rx, Timestamp_Tuple_t Tn, Timestamp_Tuple_t Rn) {
     Timestamp_Tuple_t Tp, Rp;
     Tp = rangingTable->T4;
     Rp = rangingTable->R4;
@@ -130,14 +128,6 @@ float assistedCalculateTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, 
     }
 
     printAssistedCalculateTuple(Tp, Rp, Tx, Rx, Tn, Rn);
-
-    if(mode == CORRECT) {
-        // make sure Tp, Tn are contiguous
-        if((uint16_t)(Tp.seqNumber + 1) != Tn.seqNumber) {
-            DEBUG_PRINT("Warning: Computational data non-contiguous\n");
-            return NULL_TOF;
-        }
-    }
 
     // make sure Tp, Rx, Tn are in order
     if(!(Tp.timestamp.full < Rx.timestamp.full && Rx.timestamp.full < Tn.timestamp.full)) {
@@ -204,6 +194,33 @@ first calculation:
         else {
             Tof23 = (float)((diffA1 * Rb1 + diffA1 * Db1 + diffB1 * Ra1 + diffB1 * Da1) / 2 - Rb1 * rangingTable->PTof) / (float)Db1;
         }
+
+        // abnormal result
+        float D = (Tof23 * VELOCITY) / 2;
+        if(D < 0 || D > 1000) {
+            if(state == FIRST_CALCULATE) {
+                DEBUG_PRINT("Warning: First Calling, D = %f is out of range of(0, 1000)", D);
+                #if defined(CLASSIC_TOF_ENABLE)
+                    // Fallback to classic ToF calculation
+                    Tof23 = (diffA1 * Rb1 + diffA1 * Db1 + diffB1 * Ra1 + diffB1 * Da1) / (float)(Ra1 + Db1 + Rb1 + Da1);
+                #else
+                    // Fallback to second calling ToF calculation
+                    Ranging_Table_t replicaTable;
+                    replicaTable.T3 = rangingTable->T1;
+                    replicaTable.R3 = rangingTable->R1;
+                    replicaTable.T4 = rangingTable->T2;
+                    replicaTable.R4 = rangingTable->R2;
+                    replicaTable.PTof = rangingTable->EPTof;
+
+                    Tof23 = calculateTof(&replicaTable, Tx, Rx, Tn, Rn, SECOND_CALCULATE);
+                #endif
+            }
+            else if(state == SECOND_CALCULATE) {
+                DEBUG_PRINT("Warning: Second Calling, recalculation also failed\n");
+                return NULL_TOF;
+            }
+        }
+
         if(state == SECOND_CALCULATE) {
             return Tof23;
         }
@@ -368,4 +385,17 @@ void printAssistedCalculateTuple(Timestamp_Tuple_t Tp, Timestamp_Tuple_t Rp, Tim
         Rp.seqNumber, Rp.timestamp.full, Tx.timestamp.full - Rp.timestamp.full, Tx.seqNumber, Tx.timestamp.full, Rn.timestamp.full - Tx.timestamp.full, Rn.seqNumber, Rn.timestamp.full);
     DEBUG_PRINT("\nTp[seq=%u, ts=%llu] <--%llu--> Rx[seq=%u, ts=%llu] <--%llu--> Tn[seq=%u, ts=%llu]\n",
         Tp.seqNumber, Tp.timestamp.full, Rx.timestamp.full - Tp.timestamp.full, Rx.seqNumber, Rx.timestamp.full, Tn.timestamp.full - Rx.timestamp.full, Tn.seqNumber, Tn.timestamp.full);
+}
+
+void printCalculateTuple(Timestamp_Tuple_t T1, Timestamp_Tuple_t R1, Timestamp_Tuple_t T2, Timestamp_Tuple_t R2, Timestamp_Tuple_t T3, Timestamp_Tuple_t R3, Timestamp_Tuple_t T4, Timestamp_Tuple_t R4) {
+    DEBUG_PRINT("\nT1[seq=%u, ts=%llu] <--%llu--> R2[seq=%u, ts=%llu] <--%llu--> T3[seq=%u, ts=%llu] <--%llu--> R4[seq=%u, ts=%llu]\n",
+                T1.seqNumber, T1.timestamp.full,
+                R2.timestamp.full - T1.timestamp.full, R2.seqNumber, R2.timestamp.full,
+                T3.timestamp.full - R2.timestamp.full, T3.seqNumber, T3.timestamp.full,
+                R4.timestamp.full - T3.timestamp.full, R4.seqNumber, R4.timestamp.full);
+    DEBUG_PRINT("\nR1[seq=%u, ts=%llu] <--%llu--> T2[seq=%u, ts=%llu] <--%llu--> R3[seq=%u, ts=%llu] <--%llu--> T4[seq=%u, ts=%llu]\n",
+                R1.seqNumber, R1.timestamp.full,
+                T2.timestamp.full - R1.timestamp.full, T2.seqNumber, T2.timestamp.full,
+                R3.timestamp.full - T2.timestamp.full, R3.seqNumber, R3.timestamp.full,
+                T4.timestamp.full - R3.timestamp.full, T4.seqNumber, T4.timestamp.full);
 }
