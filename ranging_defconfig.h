@@ -3,7 +3,9 @@
 
 // #define         CLASSIC_TOF_ENABLE
 #define         COORDINATE_SEND_ENABLE
+// #define         COMPENSATE_ENABLE
 
+#define         COMPENSATE_RATE             0.5
 
 #define         NULL_ADDR                   0xFFFF
 #define         NULL_SEQ                    0x0

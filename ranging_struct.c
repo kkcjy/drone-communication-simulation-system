@@ -163,6 +163,8 @@ float calculateTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, Timestam
         return NULL_TOF;
     }
 
+    printCalculateTuple(rangingTable->T3, rangingTable->R3, rangingTable->T4, rangingTable->R4, Tx, Rx, Tn, Rn);
+
 /*
 first calculation:
     first calling
@@ -222,7 +224,7 @@ first calculation:
         float D = (Tof23 * VELOCITY) / 2;
         if(D < 0 || D > 1000) {
             if(state == FIRST_CALCULATE) {
-                DEBUG_PRINT("Warning: First Calling, D = %f is out of range of(0, 1000)", D);
+                DEBUG_PRINT("Warning: First Calling, D = %f is out of range of(0, 1000)\n", D);
                 #if defined(CLASSIC_TOF_ENABLE)
                     // Fallback to classic Tof calculation
                     Tof23 = (diffA1 * Rb1 + diffA1 * Db1 + diffB1 * Ra1 + diffB1 * Da1) / (float)(Ra1 + Db1 + Rb1 + Da1);
@@ -334,7 +336,7 @@ second calculation:
         float D = (Tof34 * VELOCITY) / 2;
         if(D < 0 || D > 1000) {
             if(state == FIRST_CALCULATE) {
-                DEBUG_PRINT("Warning: First Calling, D = %f is out of range of(0, 1000)", D);
+                DEBUG_PRINT("Warning: First Calling, D = %f is out of range of(0, 1000)\n", D);
                 #if defined(CLASSIC_TOF_ENABLE)
                     // Fallback to classic Tof calculation
                     Tof34 = (diffA2 * Rb2 + diffA2 * Db2 + diffB2 * Ra2 + diffB2 * Da2) / (float)(Ra2 + Db2 + Rb2 + Da2);

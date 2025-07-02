@@ -88,18 +88,30 @@ Coordinate_Tuple_t getCurrentLocation() {
 
 void reverseVilocity() {
     #if defined(RANDOM_MOVE_ENABLE)
-        if(localHost->location.x < FLIGHT_AREA_LOW_BASE || localHost->location.x > FLIGHT_AREA_UPON_BASE) {
-            localHost->velocity.x -= 2 * localHost->velocity.x;
+        if(localHost->location.x < FLIGHT_AREA_LOW_BASE) {
+            localHost->velocity.x = abs(localHost->velocity.x);
         }
-        if(localHost->location.y < FLIGHT_AREA_LOW_BASE || localHost->location.y > FLIGHT_AREA_UPON_BASE) {
-            localHost->velocity.y -= 2 * localHost->velocity.y;
+        else if(localHost->location.x > FLIGHT_AREA_UPON_BASE) {
+            localHost->velocity.x = -abs(localHost->velocity.x);
         }
-        if(localHost->location.z < FLIGHT_AREA_LOW_BASE || localHost->location.z > FLIGHT_AREA_UPON_BASE) {
-            localHost->velocity.z -= 2 * localHost->velocity.z;
+        if(localHost->location.y < FLIGHT_AREA_LOW_BASE) {
+            localHost->velocity.y = abs(localHost->velocity.y);
+        }
+        else if(localHost->location.y > FLIGHT_AREA_UPON_BASE) {
+            localHost->velocity.y = -abs(localHost->velocity.y);
+        }
+        if(localHost->location.z < FLIGHT_AREA_LOW_BASE) {
+            localHost->velocity.z = abs(localHost->velocity.z);
+        }
+        else if(localHost->location.z > FLIGHT_AREA_UPON_BASE) {
+            localHost->velocity.z = -abs(localHost->velocity.z);
         }
     #elif defined(OPPOSITE_MOVE_ENABLE) 
-        if(localHost->location.x < OPPOSITE_DISTANCE_BASE || localHost->location.x > FLIGHT_AREA_UPON_BASE) {
-            localHost->velocity.x -= 2 * localHost->velocity.x;
+        if(localHost->location.x < OPPOSITE_DISTANCE_BASE) {
+            localHost->velocity.x = localHost->localAddress % 2 == 0 ? OPPOSITE_VELOCITY : 0;
+        } 
+        else if(localHost->location.x > FLIGHT_AREA_UPON_BASE) {
+            localHost->velocity.x = localHost->localAddress % 2 == 0 ? -OPPOSITE_VELOCITY : 0;
         }
     #endif
 }

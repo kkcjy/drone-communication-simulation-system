@@ -47,7 +47,7 @@ typedef         uint32_t                    Time_t;
 #define         OPPOSITE_DISTANCE_BASE      5000                // (mm)low distance of drones in OPPOSITE mode     
 
 // LOCAL_HOST_H
-#define         FLIGHT_AREA_UPON_BASE       40000               // (mm)upon space of area for drones to fly
+#define         FLIGHT_AREA_UPON_BASE       50000               // (mm)upon space of area for drones to fly
 #define         FLIGHT_AREA_LOW_BASE        10000               // (mm)low space of area for drones to fly
 
 // LOCK_H
