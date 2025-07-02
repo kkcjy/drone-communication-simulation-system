@@ -10,6 +10,7 @@
 typedef struct {
     uint16_t localAddress;              // local address
     uint64_t baseTime;                  // local base time(ms)  —— for a same world time
+    uint64_t lastOperationTime;         // used for modifyLocation
     #ifdef COORDINATE_SEND_ENABLE
     Coordinate_Tuple_t location;        // local location
     #endif
@@ -26,7 +27,7 @@ uint16_t string_to_hash(const char *str);
 void localInit(uint16_t address);
 uint64_t xTaskGetTickCount();
 Coordinate_Tuple_t getCurrentLocation();
-void modifyLocation(Time_t time_delay);
+void modifyLocation();
 void local_sleep(uint64_t milliseconds);
 
 #endif

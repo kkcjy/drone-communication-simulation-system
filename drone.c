@@ -69,6 +69,7 @@ void *receive_from_center(void *arg) {
 
             // get curTime and localLocation
             #ifdef COORDINATE_SEND_ENABLE
+                modifyLocation();
                 Coordinate_Tuple_t localLocation = getCurrentLocation();
                 Coordinate_Tuple_t remoteLocation = ranging_msg->header.TxCoordinate;
                 // printf("[local]:  x = %d, y = %d, z = %d\n[remote]: x = %d, y = %d, z = %d\n", localLocation.x, localLocation.y, localLocation.z, remoteLocation.x, remoteLocation.y, remoteLocation.z);
@@ -179,14 +180,6 @@ int main(int argc, char *argv[]) {
     while (1) {
         // DEBUG_PRINT("[QueueTaskTx]: send the message[%u] from %s at %llu\n", rangingTableSet->localSeqNumber, local_drone_id, xTaskGetTickCount());
         Time_t time_delay = QueueTaskTx(&queueTaskLock, MESSAGE_SIZE, send_to_center, center_socket, local_drone_id);
-        
-        #ifdef ALIGN_ENABLE
-            if(rangingTableSet->localSeqNumber > ALIGN_ROUNDS) {
-                modifyLocation(time_delay);
-            }
-        #else
-            modifyLocation(time_delay);
-        #endif
 
         local_sleep(time_delay); 
     }

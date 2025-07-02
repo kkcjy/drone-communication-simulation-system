@@ -2,6 +2,7 @@
 
 
 Local_Host_t *localHost;
+extern Ranging_Table_Set_t *rangingTableSet;
 
 static _Atomic uint64_t last_time = 0;
 
@@ -41,6 +42,7 @@ void localInit(uint16_t address) {
     localHost = (Local_Host_t*)malloc(sizeof(Local_Host_t));
     localHost->localAddress = address;
     localHost->baseTime = 0;
+    localHost->lastOperationTime = 0;
 
     srand((unsigned int)(get_current_milliseconds()));
 
@@ -102,10 +104,33 @@ void reverseVilocity() {
     #endif
 }
 
-void modifyLocation(Time_t time_delay) {
-    localHost->location.x += localHost->velocity.x * time_delay;
-    localHost->location.y += localHost->velocity.y * time_delay;
-    localHost->location.z += localHost->velocity.z * time_delay;
+void modifyLocation() {
+    #ifdef ALIGN_ENABLE
+        if(rangingTableSet->localSeqNumber < ALIGN_ROUNDS) {
+            localHost->lastOperationTime = xTaskGetTickCount();
+        }
+        else {
+            uint64_t curTime = xTaskGetTickCount();
+            uint64_t diffTime = curTime - localHost->lastOperationTime;
+            localHost->lastOperationTime = curTime;
+            localHost->location.x += localHost->velocity.x * diffTime;
+            localHost->location.y += localHost->velocity.y * diffTime;
+            localHost->location.z += localHost->velocity.z * diffTime;
+        }
+    #else
+        if(localHost->lastOperationTime == 0) {
+            localHost->lastOperationTime = xTaskGetTickCount();
+        }
+        else {
+            uint64_t curTime = xTaskGetTickCount();
+            uint64_t diffTime = curTime - localHost->lastOperationTime;
+            localHost->lastOperationTime = curTime;
+            localHost->location.x += localHost->velocity.x * diffTime;
+            localHost->location.y += localHost->velocity.y * diffTime;
+            localHost->location.z += localHost->velocity.z * diffTime;
+        }
+    #endif
+
     reverseVilocity();
 }
 

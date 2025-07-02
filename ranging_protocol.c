@@ -146,6 +146,7 @@ Time_t generateMessage(Ranging_Message_t *rangingMessage) {
     curTimestamp.timestamp.full = xTaskGetTickCount();
 
     #ifdef COORDINATE_SEND_ENABLE
+        modifyLocation();
         Coordinate_Tuple_t curCoordinate = getCurrentLocation();
         updateSendList(&rangingTableSet->sendList, curTimestamp, curCoordinate);
     #else
@@ -290,7 +291,7 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
 
         if(initTof != NULL_TOF) {
             float initD = (initTof * VELOCITY) / 2;
-            DEBUG_PRINT("[current_%u]: ModifiedD = %f, ClassicD = %f", MY_UWB_ADDRESS, initD, initD);
+            DEBUG_PRINT("[init_%u]: ModifiedD = %f, ClassicD = %f", MY_UWB_ADDRESS, initD, initD);
             #ifdef COORDINATE_SEND_ENABLE
                 DEBUG_PRINT(", TrueD = %f", TrueD);
             #endif
