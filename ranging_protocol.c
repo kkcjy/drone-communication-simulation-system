@@ -319,7 +319,7 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
 
         // calculation failed
         else {
-            DEBUG_PRINT("[modifiedCalculateTof]: calculate failed, caused by lossing packet ---> recalculate\n");
+            DEBUG_PRINT("[modifiedCalculateTof]: calculate failed ---> recalculate\n");
             // data loss caused by lossing packet ---> recalculate
             /* Tn and Rn are full  =>  using T1, R1, T2, R2, T3, R3, Tn, Rn
             +------+------+------+------+------+------+
@@ -330,11 +330,15 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
             */
             if(Tn.seqNumber != NULL_SEQ && Rn.seqNumber != NULL_SEQ) {
                 Ranging_Table_t tmpRangingTable;
+                tmpRangingTable.T1 = nullTimestampTuple;
+                tmpRangingTable.R1 = nullTimestampTuple;
+                tmpRangingTable.T2 = nullTimestampTuple;
+                tmpRangingTable.R2 = nullTimestampTuple;
                 tmpRangingTable.T3 = rangingTable->T1;
                 tmpRangingTable.R3 = rangingTable->R1;
                 tmpRangingTable.T4 = rangingTable->T2;
                 tmpRangingTable.R4 = rangingTable->R2;
-                ModifiedTof = calculateTof(&tmpRangingTable, rangingTable->T3, rangingTable->R3, Tn, Rn, SECOND_CALCULATE);
+                ModifiedTof = calculateTof(&tmpRangingTable, rangingTable->T3, rangingTable->R3, Tn, Rn, FIRST_CALCULATE);
             }
             /* Tx and Rx are full  =>  using T2, R2, T3, R3, T4, R4, Tx, Rx
             +------+------+------+------+------+------+
@@ -345,11 +349,15 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
             */
             else if(Tx.seqNumber != NULL_SEQ && Rx.seqNumber != NULL_SEQ) {
                 Ranging_Table_t tmpRangingTable;
+                tmpRangingTable.T1 = nullTimestampTuple;
+                tmpRangingTable.R1 = nullTimestampTuple;
+                tmpRangingTable.T2 = nullTimestampTuple;
+                tmpRangingTable.R2 = nullTimestampTuple;
                 tmpRangingTable.T3 = rangingTable->T2;
                 tmpRangingTable.R3 = rangingTable->R2;
                 tmpRangingTable.T4 = rangingTable->T3;
                 tmpRangingTable.R4 = rangingTable->R3;
-                ModifiedTof = calculateTof(&tmpRangingTable, rangingTable->T4, rangingTable->R4, Tx, Rx, SECOND_CALCULATE);
+                ModifiedTof = calculateTof(&tmpRangingTable, rangingTable->T4, rangingTable->R4, Tx, Rx, FIRST_CALCULATE);
             }
             // recalculation failed, use the Tof calculated last time
             if(ModifiedTof == NULL_TOF) {

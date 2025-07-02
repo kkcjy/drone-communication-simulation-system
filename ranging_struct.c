@@ -112,7 +112,7 @@ void fillRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, Times
     }
 }
 
-/* assist calculating the Time of Flight (ToF) based on the timestamps in the ranging table
+/* assist calculating the Time of Flight (Tof) based on the timestamps in the ranging table
        Rp   <--Db-->    Tx      <--Rb-->       Rn
 
     Tp      <--Ra-->      Rx    <--Da-->    Tn
@@ -129,8 +129,9 @@ float assistedCalculateTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, 
 
     printAssistedCalculateTuple(Tp, Rp, Tx, Rx, Tn, Rn);
 
-    // make sure Tp, Rx, Tn are in order
-    if(!(Tp.timestamp.full < Rx.timestamp.full && Rx.timestamp.full < Tn.timestamp.full)) {
+    // make sure Tp, Rx, Tn and Rp, Tx, Rn are in order
+    if(!(Tp.timestamp.full < Rx.timestamp.full && Rx.timestamp.full < Tn.timestamp.full
+        && Rp.timestamp.full < Tx.timestamp.full && Tx.timestamp.full < Rn.timestamp.full)) {
         DEBUG_PRINT("Warning: Computational data not in order\n");
         return NULL_TOF;
     }
@@ -148,34 +149,56 @@ float assistedCalculateTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, 
     return PTof;
 }
 
-/* calculate the Time of Flight (ToF) based on the timestamps in the ranging table
-            +------+------+------+------+------+------+          +------+------+------+------+------+------+
-            |  T1  |  R2  |  T3  |  R4  |  Tx  |  Rn  |          | ET1  | ER2  |  T1  |  R2  |  T3  |  R4  |
-    view    +------+------+------+------+------+------+    as    +------+------+------+------+------+------+
-            |  R1  |  T2  |  R3  |  T4  |  Rx  |  Tn  |          | ER1  | ET2  |  R1  |  T2  |  R3  |  T4  |
-            +------+------+------+------+------+------+          +------+------+------+------+------+------+
+/* calculate the Time of Flight (Tof) based on the timestamps in the ranging table
+    +------+------+------+------+------+------+
+    |  T1  |  R2  |  T3  |  R4  |  Tx  |  Rn  |
+    +------+------+------+------+------+------+
+    |  R1  |  T2  |  R3  |  T4  |  Rx  |  Tn  |
+    +------+------+------+------+------+------+       
 */
 float calculateTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tx, Timestamp_Tuple_t Rx, Timestamp_Tuple_t Tn, Timestamp_Tuple_t Rn, CalculateState state) {
     if(rangingTable->T3.seqNumber == NULL_SEQ || rangingTable->R3.seqNumber == NULL_SEQ || rangingTable->T4.seqNumber == NULL_SEQ || rangingTable->R4.seqNumber == NULL_SEQ 
         || Tx.seqNumber == NULL_SEQ || Rx.seqNumber == NULL_SEQ || Tn.seqNumber == NULL_SEQ || Rn.seqNumber == NULL_SEQ) {
-        DEBUG_PRINT("Error: Info of rangingTable is not full in calculateTof\n");
+        DEBUG_PRINT("Warning: Computational data incompleteness\n");
         return NULL_TOF;
     }
-/*  
+
+/*
 first calculation:
     first calling
-    T1       <--Ra1-->       R2    <--Da1-->    T3
+    T3       <--Ra1-->       R4    <--Da1-->    Tx
 
-       R1    <--Db1-->    T2       <--Rb1-->       R3
+       R3    <--Db1-->    T4       <--Rb1-->       Rx
 
     second calling
-   ET1       <--Ra1-->      ER2    <--Da1-->    T3
+   T1        <--Ra1-->       R2    <--Da1-->    Tx
 
-      ER1    <--Db1-->   ET2       <--Rb1-->       R3
+      R1     <--Db1-->    T2       <--Rb1-->       Rx
 ----------------------------------------------------------------------
-    Tof23 = (Ra1 * Rb1 - Da1 * Db1) / Db1 - Rb1 * PTof / Db1
+    Tof23 = Tof4 + Tofx = (Ra1 * Rb1 - Da1 * Db1) / Db1 - Rb1 * PTof / Db1
 */
     float Tof23 = NULL_TOF;
+
+    // make sure R3, T4, Rx and T3, R4, Tx are in order
+    if(!(rangingTable->R3.timestamp.full < rangingTable->T4.timestamp.full && rangingTable->T4.timestamp.full < Rx.timestamp.full
+        && rangingTable->T3.timestamp.full < rangingTable->R4.timestamp.full && rangingTable->R4.timestamp.full < Tx.timestamp.full)) {
+        if(state == FIRST_CALCULATE) {
+            DEBUG_PRINT("Warning: First Calling, Computational data not in order");
+            // Fallback to second calling Tof calculation
+            Ranging_Table_t replicaTable;
+            replicaTable.T3 = rangingTable->T1;
+            replicaTable.R3 = rangingTable->R1;
+            replicaTable.T4 = rangingTable->T2;
+            replicaTable.R4 = rangingTable->R2;
+            replicaTable.PTof = rangingTable->EPTof;
+
+            Tof23 = calculateTof(&replicaTable, Tx, Rx, Tn, Rn, SECOND_CALCULATE);
+        }
+        else if(state == SECOND_CALCULATE) {
+            DEBUG_PRINT("Warning: Second Calling, recalculation also failed\n");
+            return NULL_TOF;
+        }
+    }
 
     int64_t Ra1 = (rangingTable->R4.timestamp.full - rangingTable->T3.timestamp.full + UWB_MAX_TIMESTAMP) % UWB_MAX_TIMESTAMP;
     int64_t Db1 = (rangingTable->T4.timestamp.full - rangingTable->R3.timestamp.full + UWB_MAX_TIMESTAMP) % UWB_MAX_TIMESTAMP;
@@ -190,7 +213,7 @@ first calculation:
     if(Ra_Da_1 < CONVERGENCE_THRESHOLD || Rb_Db_1 < CONVERGENCE_THRESHOLD) {
         if(Ra_Da_1 < Rb_Db_1) {
             Tof23 = (float)((diffA1 * Rb1 + diffA1 * Db1 + diffB1 * Ra1 + diffB1 * Da1) / 2 - Ra1 * rangingTable->PTof) / (float)Da1;
-        } 
+        }
         else {
             Tof23 = (float)((diffA1 * Rb1 + diffA1 * Db1 + diffB1 * Ra1 + diffB1 * Da1) / 2 - Rb1 * rangingTable->PTof) / (float)Db1;
         }
@@ -201,10 +224,10 @@ first calculation:
             if(state == FIRST_CALCULATE) {
                 DEBUG_PRINT("Warning: First Calling, D = %f is out of range of(0, 1000)", D);
                 #if defined(CLASSIC_TOF_ENABLE)
-                    // Fallback to classic ToF calculation
+                    // Fallback to classic Tof calculation
                     Tof23 = (diffA1 * Rb1 + diffA1 * Db1 + diffB1 * Ra1 + diffB1 * Da1) / (float)(Ra1 + Db1 + Rb1 + Da1);
                 #else
-                    // Fallback to second calling ToF calculation
+                    // Fallback to second calling Tof calculation
                     Ranging_Table_t replicaTable;
                     replicaTable.T3 = rangingTable->T1;
                     replicaTable.R3 = rangingTable->R1;
@@ -224,15 +247,17 @@ first calculation:
         if(state == SECOND_CALCULATE) {
             return Tof23;
         }
-    } 
+    }
+
+    // beyond CONVERGENCE_THRESHOLD
     else {
         if(state == FIRST_CALCULATE) {
             DEBUG_PRINT("Warning: First Calling, Ra1/Da1 and Rb1/Db1 are both greater than CONVERGENCE_THRESHOLD(%d), Ra_Da_1 = %f, Rb_Db_1 = %f\n", CONVERGENCE_THRESHOLD, Ra_Da_1, Rb_Db_1);
             #if defined(CLASSIC_TOF_ENABLE)
-                // Fallback to classic ToF calculation
+                // Fallback to classic Tof calculation
                 Tof23 = (diffA1 * Rb1 + diffA1 * Db1 + diffB1 * Ra1 + diffB1 * Da1) / (float)(Ra1 + Db1 + Rb1 + Da1);
             #else
-                // Fallback to second calling ToF calculation
+                // Fallback to second calling Tof calculation
                 Ranging_Table_t replicaTable;
                 replicaTable.T3 = rangingTable->T1;
                 replicaTable.R3 = rangingTable->R1;
@@ -253,18 +278,39 @@ first calculation:
 /*
 second calculation:
     first calling
-       R2    <--Db2-->    T3      <--Rb2-->       R4
+       R4    <--Db2-->    Tx      <--Rb2-->       Rn
 
-    T2       <--Ra2-->      R3    <--Da2-->    T4
+    T4       <--Ra2-->      Rx    <--Da2-->    Tn
 
     second calling
-      ER2    <--Db2-->    T1      <--Rb2-->       R4
+       R2    <--Db2-->    T3      <--Rb2-->       Rn
 
-   ET2       <--Ra2-->      R1    <--Da2-->    T4
+    T2       <--Ra2-->      R3    <--Da2-->    Tn
 ----------------------------------------------------------------------
-    Tof34 = (Ra2 * Rb2 - Da2 * Db2) / Db2 - Rb2 * Tof23 / Db2
+    Tof34 = Tofx + Tofn = (Ra2 * Rb2 - Da2 * Db2) / Db2 - Rb2 * Tof23 / Db2
 */
     float Tof34 = NULL_TOF;
+
+    // make sure T4, Rx, Tn and R4, Tx, Rn are in order
+    if(!(rangingTable->T4.timestamp.full < Rx.timestamp.full && Rx.timestamp.full < Tn.timestamp.full
+        && rangingTable->R4.timestamp.full < Tx.timestamp.full && Tx.timestamp.full < Rn.timestamp.full)) {
+        if(state == FIRST_CALCULATE) {
+            DEBUG_PRINT("Warning: First Calling, Computational data not in order");
+            // Fallback to second calling Tof calculation
+            Ranging_Table_t replicaTable;
+            replicaTable.T3 = rangingTable->T2;
+            replicaTable.R3 = rangingTable->R2;
+            replicaTable.T4 = rangingTable->T3;
+            replicaTable.R4 = rangingTable->R3;
+            replicaTable.PTof = (rangingTable->PTof + rangingTable->EPTof) / 2;
+
+            Tof23 = calculateTof(&replicaTable, Tn, Rn, Tx, Rx, SECOND_CALCULATE);
+        }
+        else if(state == SECOND_CALCULATE) {
+            DEBUG_PRINT("Warning: Should not be called\n");
+            return NULL_TOF;
+        }
+    }
 
     int64_t Ra2 = (Rx.timestamp.full - rangingTable->T4.timestamp.full + UWB_MAX_TIMESTAMP) % UWB_MAX_TIMESTAMP;
     int64_t Db2 = (Tx.timestamp.full - rangingTable->R4.timestamp.full + UWB_MAX_TIMESTAMP) % UWB_MAX_TIMESTAMP;
@@ -279,19 +325,45 @@ second calculation:
     if(Ra_Da_2 < CONVERGENCE_THRESHOLD || Rb_Db_2 < CONVERGENCE_THRESHOLD) {
         if(Ra_Da_2 < Rb_Db_2) {
             Tof34 = (float)((diffA2 * Rb2 + diffA2 * Db2 + diffB2 * Ra2 + diffB2 * Da2) / 2 - Ra2 * Tof23) / (float)Da2;
-        } 
+        }
         else {
             Tof34 = (float)((diffA2 * Rb2 + diffA2 * Db2 + diffB2 * Ra2 + diffB2 * Da2) / 2 - Rb2 * Tof23) / (float)Db2;
+        }
+
+        // abnormal result
+        float D = (Tof34 * VELOCITY) / 2;
+        if(D < 0 || D > 1000) {
+            if(state == FIRST_CALCULATE) {
+                DEBUG_PRINT("Warning: First Calling, D = %f is out of range of(0, 1000)", D);
+                #if defined(CLASSIC_TOF_ENABLE)
+                    // Fallback to classic Tof calculation
+                    Tof34 = (diffA2 * Rb2 + diffA2 * Db2 + diffB2 * Ra2 + diffB2 * Da2) / (float)(Ra2 + Db2 + Rb2 + Da2);
+                #else
+                    // Fallback to second calling Tof calculation
+                    Ranging_Table_t replicaTable;
+                    replicaTable.T3 = rangingTable->T2;
+                    replicaTable.R3 = rangingTable->R2;
+                    replicaTable.T4 = rangingTable->T3;
+                    replicaTable.R4 = rangingTable->R3;
+                    replicaTable.PTof = (rangingTable->PTof + rangingTable->EPTof) / 2;
+
+                    Tof34 = calculateTof(&replicaTable, Tn, Rn, Tx, Rx, SECOND_CALCULATE);
+                #endif
+            }
+            else if(state == SECOND_CALCULATE) {
+                DEBUG_PRINT("Warning: Should not be called\n");
+                return NULL_TOF;
+            }
         }
     } 
     else {
         if(state == FIRST_CALCULATE) {
             DEBUG_PRINT("Warning: First Calling, Ra2/Da2 and Rb2/Db2 are both greater than CONVERGENCE_THRESHOLD(%d), Ra_Da_2 = %f, Rb_Db_2 = %f\n", CONVERGENCE_THRESHOLD, Ra_Da_2, Rb_Db_2);
             #if defined(CLASSIC_TOF_ENABLE)
-                // Fallback to classic ToF calculation
+                // Fallback to classic Tof calculation
                 Tof34 = (diffA2 * Rb2 + diffA2 * Db2 + diffB2 * Ra2 + diffB2 * Da2) / (float)(Ra2 + Db2 + Rb2 + Da2);
             #else
-                // Fallback to second calling ToF calculation
+                // Fallback to second calling Tof calculation
                 Ranging_Table_t replicaTable;
                 replicaTable.T3 = rangingTable->T2;
                 replicaTable.R3 = rangingTable->R2;
