@@ -54,15 +54,60 @@ python3 data_process.py
 This script will generate a plot of the adjusted data and save it as `data.png`.
 
 ## Code Structure
-- `local_host`: Initializes the local host by setting address, base time, location, and velocity. It provides basic configuration for the system.
-- `ranging_struct`: Define a series of types and structures, providing data structure definitions for the entire project. 
-- `modified_ranging`: Implements the modified ranging algorithm, including table initialization, neighbor registration, and buffer data addition. It's the core of the ranging algorithm.
-- `socket_frame`: Defines the socket communication framework with message structures and constants. It enables data transmission between the drone simulator and the control center.
-- `drone`: Implements the drone simulator for message sending, receiving, and processing. It simulates drone behavior using the socket framework.
-- `center_control`: Implements the control center for handling drone connections, broadcasting messages, and managing the drone list. It manages the overall system.
-- `data_process`: Processes and visualizes simulation data. It reads data from files, calculates offsets, and draws plots to help developers understand algorithm performance.
-- `lock`: Implements a thread - safe message processing locking mechanism.
-- `debug`: Defines a debug printing function DEBUG_PRINT to assist developers in debugging.
+- `local_host`: Initializes the local host, including address, base time, location, and velocity, providing the system’s basic configuration.
+- `ranging_struct`: Defines all necessary types and data structures used throughout the project.
+- `ranging_protocol`: Core module for ranging, responsible for table initialization, updating, running the ranging algorithm, and handling related logic.
+- `socket_frame`: Implements the socket communication framework, including message structures and constants, enabling data exchange between the drone simulator and the control center.
+- `drone`: Simulates drone behavior, handling message sending, receiving, and processing using the socket framework.
+- `center_control`: Manages the control center, including drone connections, message broadcasting, and drone list management, overseeing the entire system.
+- `data_process`: Processes and visualizes simulation data by reading files, calculating offsets, and generating plots to help analyze algorithm performance.
+- `lock`: Provides a thread-safe locking mechanism for message processing to ensure data consistency in multithreaded environments.
+- `debug`: Defines the `DEBUG_PRINT` function to assist with debugging and development.
+
+## Computation Process
+### initialize
++------+------+------+------+------+------+------+
+|  T1  |  R2  |  T3  |  R4  | [Tx] | [Rn] |      |
++------+------+------+------+------+------+------+
+|  R1  |  T2  |  R3  |  T4  | (Rx) | [Tn] | [Rr] |
++------+------+------+------+------+------+------+
+- **normal**: calculate and shift
++------+------+------+------+------+------+------+
+|  T3  |  R4  |  Tx  |  Rn  |      |      |      |
++------+------+------+------+------+------+------+
+|  R3  |  T4  |  Rx  |  Tn  | (Rr) |      |      |
++------+------+------+------+------+------+------+
+- **not enough data for calculation**: shift{add mechanism to detect whether the timestamp is complete}
++------+------+------+------+------+------+------+
+|  T3  |  R4  |  Tx  |  Rn  |      |      |      |
++------+------+------+------+------+------+------+
+|  R3  |  T4  |  Rx  |  Tn  | (Rr) |      |      |
++------+------+------+------+------+------+------+
+- **lossing packet**: recalculate
++------+------+------+------+------+------+------+
+|  T1  |  R2  |  T3  |  R4  |      |      |      |
++------+------+------+------+------+------+------+
+|  R1  |  T2  |  R3  |  T4  | (Rr) |      |      |
++------+------+------+------+------+------+------+
+
+### calculate
++------+------+------+------+------+------+------+
+|  T1  |  R2  |  T3  |  R4  | [Tx] | [Rn] |      |
++------+------+------+------+------+------+------+
+|  R1  |  T2  |  R3  |  T4  | (Rx) | [Tn] | [Rr] |
++------+------+------+------+------+------+------+
+- **normal**: calculate and shift
++------+------+------+------+------+------+------+
+|  T3  |  R4  |  Tx  |  Rn  |      |      |      |
++------+------+------+------+------+------+------+
+|  R1  |  T4  |  Rx  |  Tn  | (Rr) |      |      |
++------+------+------+------+------+------+------+
+- **lossing packet**: recalculate{recalculate=>fill in PTof, SECOND_CALCULATE}
++------+------+------+------+------+------+------+
+|  T1  |  R2  |  T3  |  R4  |      |      |      |
++------+------+------+------+------+------+------+
+|  R1  |  T2  |  R3  |  T4  | (Rr) |      |      |
++------+------+------+------+------+------+------+
 
 ## Configuration
 The project can be configured through preprocessor directives in the source code. For example, you can enable or disable features such as dynamic ranging frequency, packet loss simulation, and position sending by defining or undefining the corresponding macros in the source files.

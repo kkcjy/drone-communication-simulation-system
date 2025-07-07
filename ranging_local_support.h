@@ -2,6 +2,7 @@
 #define RANGING_LOCAL_SUPPORT_H
 #define _POSIX_C_SOURCE 200809L
 
+#include <assert.h>
 #include <limits.h>
 #include <math.h>
 #include <pthread.h>

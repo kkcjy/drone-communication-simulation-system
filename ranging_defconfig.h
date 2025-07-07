@@ -12,6 +12,8 @@
 #define         NULL_TIMESTAMP              0xFFFFFFFFU
 #define         NULL_INDEX                  0xFF
 #define         NULL_TOF                    -1.0f
+#define         INCOMPLETE_SIGN             -2.0f
+#define         MISORDER_SIGN               -3.0f
 
 #define         table_index_t               uint8_t
 #define         index_t                     uint8_t
@@ -20,7 +22,10 @@
 #define         MESSAGE_BODY_UNIT_SIZE      2
 
 #define         SEND_LIST_SIZE              5
-#define         RANGING_TABLE_SIZE          10                
+#define         RANGING_TABLE_SIZE          10        
+
+#define         UPPER_BOUND_DISTANCE        1000
+#define         LOWER_BOUND_DISTANCE        0
 
 #define         RANGING_PERIOD              200
 #define         UWB_MAX_TIMESTAMP           1099511627776

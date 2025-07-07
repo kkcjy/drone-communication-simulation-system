@@ -72,10 +72,12 @@ void *receive_from_center(void *arg) {
                 modifyLocation();
                 Coordinate_Tuple_t localLocation = getCurrentLocation();
                 Coordinate_Tuple_t remoteLocation = ranging_msg->header.TxCoordinate;
+
                 DEBUG_PRINT("[local]:  x = %d, y = %d, z = %d\n[remote]: x = %d, y = %d, z = %d\n", localLocation.x, localLocation.y, localLocation.z, remoteLocation.x, remoteLocation.y, remoteLocation.z);
+                
                 float distance = sqrt(pow((localLocation.x - remoteLocation.x), 2) + pow((localLocation.y - remoteLocation.y), 2) + pow((localLocation.z - remoteLocation.z), 2));
                 float Tof = (distance / 1000) / VELOCITY;
-                // printf("[%s -> %s][%d]: D = %f, TOF  = %f\n", msg.sender_id, local_drone_id, ranging_msg->header.msgSequence, distance, Tof);
+                
                 local_sleep(Tof);
             #endif
 
