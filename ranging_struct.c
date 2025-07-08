@@ -16,7 +16,8 @@ void rangingTableInit(Ranging_Table_t *rangingTable) {
 
     rangingTable->PTof = NULL_TOF;
     rangingTable->EPTof = NULL_TOF;
-    rangingTable->flag = false;
+    rangingTable->continuitySign = false;
+    rangingTable->expirationSign = true;
     rangingTable->state = UNUSED;
 }
 
@@ -26,14 +27,76 @@ table_index_t registerRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_
         return NULL_INDEX;
     }
 
-    rangingTableSet->rangingTable[rangingTableSet->counter].neighborAddress = address;
-    rangingTableSet->rangingTable[rangingTableSet->counter].state = USING;
-    rangingTableSet->priorityQueue[rangingTableSet->counter] = rangingTableSet->counter;
-    rangingTableSet->counter++;
+    for(table_index_t index = 0; index < RANGING_TABLE_SIZE; index++) {
+        if(rangingTableSet->rangingTable[index].state == UNUSED) {
+            rangingTableSet->rangingTable[index].neighborAddress = address;
+            rangingTableSet->rangingTable[index].state = USING;
+            rangingTableSet->priorityQueue[rangingTableSet->counter] = index;
+            rangingTableSet->counter++;
 
-    DEBUG_PRINT("Registered new ranging table entry: Address=%u\n", address);
+            DEBUG_PRINT("Registered new ranging table entry: Address = %u\n", address);
+            return index;
+        }
+    }
 
-    return rangingTableSet->counter - 1;
+    assert(0 && "Warning: Should not be called\n");
+    return NULL_INDEX;
+}
+
+void deregisterRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t address) {
+    if(rangingTableSet->counter == 0) {
+        DEBUG_PRINT("Ranging table Set is empty, cannot deregister table\n");
+        return;
+    }
+
+    table_index_t tableIdx = NULL_INDEX;
+    for(table_index_t i = 0; i < RANGING_TABLE_SIZE; i++) {
+        if(rangingTableSet->rangingTable[i].neighborAddress == address) {
+            tableIdx = i;
+            break;
+        }
+    }
+
+    if(tableIdx == NULL_INDEX) {
+        assert(0 && "Warning: Should not be called\n");
+        return;
+    }
+
+    rangingTableSet->rangingTable[tableIdx].neighborAddress = NULL_ADDR;
+    rangingTableSet->rangingTable[tableIdx].state = UNUSED;
+
+    table_index_t queueIdx = NULL_INDEX;
+    for(table_index_t i = 0; i < rangingTableSet->counter; i++) {
+        if(rangingTableSet->priorityQueue[i] == tableIdx) {
+            queueIdx = i;
+            break;
+        }
+    }
+
+    if(queueIdx == NULL_INDEX) {
+        assert(0 && "Warning: Should not be called\n");
+        return;
+    }
+
+    for(table_index_t i = queueIdx; i < rangingTableSet->counter - 1; i++) {
+        rangingTableSet->priorityQueue[i] = rangingTableSet->priorityQueue[i+1];
+    }
+    rangingTableSet->priorityQueue[rangingTableSet->counter - 1] = NULL_INDEX;
+    rangingTableSet->counter--;
+
+    DEBUG_PRINT("Deregister ranging table entry: Address = %u\n", address);
+}
+
+void checkExpiration(Ranging_Table_Set_t *rangingTableSet) {
+    for(table_index_t i = rangingTableSet->counter; i > 0; i--) {
+        table_index_t idx = rangingTableSet->priorityQueue[i-1];
+        if(rangingTableSet->rangingTable[idx].expirationSign == true) {
+            deregisterRangingTable(rangingTableSet, rangingTableSet->rangingTable[idx].neighborAddress);
+        } 
+        else {
+            rangingTableSet->rangingTable[idx].expirationSign = true;
+        }
+    }
 }
 
 table_index_t findRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t address) {
@@ -56,7 +119,7 @@ table_index_t findRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t ad
     +------+------+------+------+------+------+
     | ETb  | ERp  |  Tb  |  Rp  | EPTof| PTof |
     +------+------+------+------+------+------+
-    | ERb  | ETp  |  Rb  |  Tp  |  Rr  | flag |
+    | ERb  | ETp  |  Rb  |  Tp  |  Rr  | sign |
     +------+------+------+------+------+------+
         <-------------
                <-------------
@@ -83,7 +146,7 @@ void shiftRangingTable(Ranging_Table_t *rangingTable) {
     +------+------+------+------+------+------+
     | ETb  | ERp  |  Tb  |  Rp  | EPTof| PTof |
     +------+------+------+------+------+------+
-    | ERb  | ETp  |  Rb  |  Tp  |  Rr  | flag |
+    | ERb  | ETp  |  Rb  |  Tp  |  Rr  | sign |
     +------+------+------+------+------+------+
                       <-- Rr <-- Tf <-- Re <-- update
 */
@@ -96,8 +159,8 @@ void fillRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr, Times
     rangingTable->PTof = PTof;
     // whether the table is contiguous
     if(rangingTable->ERp.seqNumber + 1 == rangingTable->Rp.seqNumber && rangingTable->Rb.seqNumber + 1 == rangingTable->Rr.seqNumber) {
-        if(rangingTable->flag == false) {
-            rangingTable->flag = true;
+        if(rangingTable->continuitySign == false) {
+            rangingTable->continuitySign = true;
             // correcting PTof
             Ranging_Table_t correctRangingTable;
             correctRangingTable.Tp = rangingTable->ETp;
@@ -108,7 +171,7 @@ void fillRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr, Times
         }
     }
     else {
-        rangingTable->flag = false;
+        rangingTable->continuitySign = false;
     }
 }
 
@@ -117,7 +180,7 @@ void fillRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr, Times
     +------+------+------+------+------+------+
     | ETb  | ERp  |  Tb  |  Rp  | EPTof| PTof |
     +------+------+------+------+------+------+
-    | ERb  | ETp  |  Rb  |  Tp  |  Rr  | flag |
+    | ERb  | ETp  |  Rb  |  Tp  |  Rr  | sign |
     +------+------+------+------+------+------+
                       <-- Rr <-- Tf
 */
@@ -127,7 +190,7 @@ void replaceRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr, Ti
     rangingTable->Tp = Tf;
     rangingTable->Rp = Rf;
     rangingTable->PTof = PTof;
-    rangingTable->flag = false;
+    rangingTable->continuitySign = false;
 }
 
 /* timestamps for assistedCalculatePTof
@@ -215,7 +278,7 @@ first step:
     if(!(rangingTable->Rb.timestamp.full < rangingTable->Tp.timestamp.full && rangingTable->Tp.timestamp.full < Rr.timestamp.full
         && rangingTable->Tb.timestamp.full < rangingTable->Rp.timestamp.full && rangingTable->Rp.timestamp.full < Tr.timestamp.full)) {
         // should be in order
-        assert("Warning: Should not be called\n");
+        assert(0 && "Warning: Should not be called\n");
     }
 
     int64_t Ra1 = (rangingTable->Rp.timestamp.full - rangingTable->Tb.timestamp.full + UWB_MAX_TIMESTAMP) % UWB_MAX_TIMESTAMP;
@@ -362,7 +425,7 @@ second step:
                 #endif
             }
             else if(state == SECOND_CALCULATE) {
-                assert("Warning: Should not be called\n");
+                assert(0 && "Warning: Should not be called\n");
             }
         }
     } 
@@ -387,7 +450,7 @@ second step:
             #endif
         }
         else if(state == SECOND_CALCULATE) {
-            assert("Warning: Should not be called\n");
+            assert(0 && "Warning: Should not be called\n");
         }
     }
 
@@ -443,7 +506,7 @@ void printRangingTable(Ranging_Table_t *rangingTable) {
     DEBUG_PRINT("(Rp) seqNumber: %u, timestamp: %llu\n", rangingTable->Rp.seqNumber, rangingTable->Rp.timestamp.full);
     DEBUG_PRINT("(Rr) seqNumber: %u, timestamp: %llu\n", rangingTable->Rr.seqNumber, rangingTable->Rr.timestamp.full);
 
-    DEBUG_PRINT("PTof = %f, EPTof = %f, flag = %s\n", rangingTable->PTof, rangingTable->EPTof, rangingTable->flag == true ? "true" : "false");
+    DEBUG_PRINT("PTof = %f, EPTof = %f, sign = %s\n", rangingTable->PTof, rangingTable->EPTof, rangingTable->continuitySign == true ? "true" : "false");
 }
 
 void printRangingTableSet(Ranging_Table_Set_t *rangingTableSet) {

@@ -28,6 +28,7 @@
 #define         LOWER_BOUND_DISTANCE        0
 
 #define         RANGING_PERIOD              200
+#define         CHECK_PERIOD                15
 #define         UWB_MAX_TIMESTAMP           1099511627776
 #define         VELOCITY                    0.4691763978616
 #define         CONVERGENCE_THRESHOLD       0.989

@@ -472,4 +472,10 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
         }
     }
     // printRangingTableSet(rangingTableSet);
+
+    rangingTableSet->rangingTable[neighborIndex].expirationSign = false;
+
+    if(rangingTableSet->localSeqNumber % CHECK_PERIOD == 0) {
+        checkExpiration(rangingTableSet);
+    }
 }

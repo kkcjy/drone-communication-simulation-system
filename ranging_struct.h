@@ -75,7 +75,7 @@ typedef struct {
     +------+------+------+------+------+------+
     | ETb  | ERp  |  Tb  |  Rp  | EPTof| PTof |
     +------+------+------+------+------+------+
-    | ERb  | ETp  |  Rb  |  Tp  |  Rr  | flag |
+    | ERb  | ETp  |  Rb  |  Tp  |  Rr  | sign |
     +------+------+------+------+------+------+
     Note:       1. EPTof = Tof1 + Tof2 = Tof12
                 2. PTof = Tof3 + Tof4 = Tof34
@@ -98,9 +98,10 @@ typedef struct {
     float PTof;                         // pair of Tof
     float EPTof;                        // early pair of Tof
 
-    bool flag;                          // true: contiguous, false: non-contiguous
+    bool continuitySign;                // true: contiguous | false: non-contiguous
+    bool expirationSign;                // true: no recent access --> expired | recent access --> not expired
 
-    TableState state;
+    TableState state;                   // UNUSED / USING
 } __attribute__((packed)) Ranging_Table_t;
 
 typedef struct {
@@ -121,6 +122,8 @@ typedef enum {
 
 void rangingTableInit(Ranging_Table_t *rangingTable);
 table_index_t registerRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t address);
+void deregisterRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t address);
+void checkExpiration(Ranging_Table_Set_t *rangingTableSet);
 table_index_t findRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t address);
 void shiftRangingTable(Ranging_Table_t *rangingTable);
 void fillRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr, Timestamp_Tuple_t Rr, Timestamp_Tuple_t Tf, Timestamp_Tuple_t Rf, Timestamp_Tuple_t Re, float PTof);
