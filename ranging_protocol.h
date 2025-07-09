@@ -8,7 +8,6 @@
 
 
 void rangingTableSetInit();
-// index_t searchSendList(SendList_t *sendList, uint16_t seqNumber);
 #ifdef COORDINATE_SEND_ENABLE
 void updateSendList(SendList_t *sendList, Timestamp_Tuple_t timestampTuple, Coordinate_Tuple_t coordinateTuple);
 #else

@@ -21,6 +21,7 @@ void rangingTableInit(Ranging_Table_t *rangingTable) {
     rangingTable->state = UNUSED;
 }
 
+// register a new rangingTable and return the index of rangingTable
 table_index_t registerRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t address) {
     if (rangingTableSet->counter >= RANGING_TABLE_SIZE) {
         DEBUG_PRINT("Ranging table Set is full, cannot register new table\n");
@@ -43,6 +44,7 @@ table_index_t registerRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_
     return NULL_INDEX;
 }
 
+// deregister a rangingTable by address and update the priority queue
 void deregisterRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t address) {
     if(rangingTableSet->counter == 0) {
         DEBUG_PRINT("Ranging table Set is empty, cannot deregister table\n");
@@ -87,6 +89,7 @@ void deregisterRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t addre
     DEBUG_PRINT("Deregister ranging table entry: Address = %u\n", address);
 }
 
+// check expirationSign of rangingTables and deregister rangingTable expired
 void checkExpiration(Ranging_Table_Set_t *rangingTableSet) {
     for(table_index_t i = rangingTableSet->counter; i > 0; i--) {
         table_index_t idx = rangingTableSet->priorityQueue[i-1];
@@ -99,6 +102,7 @@ void checkExpiration(Ranging_Table_Set_t *rangingTableSet) {
     }
 }
 
+// find the index of rangingTable by address
 table_index_t findRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t address) {
     if(rangingTableSet->counter == 0) {
         // DEBUG_PRINT("Ranging table Set is empty, cannot find table\n");
@@ -158,7 +162,7 @@ void fillRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr, Times
     rangingTable->Rr = Re;
     rangingTable->PTof = PTof;
     // whether the table is contiguous
-    if(rangingTable->ERp.seqNumber + 1 == rangingTable->Rp.seqNumber && rangingTable->Rb.seqNumber + 1 == rangingTable->Rr.seqNumber) {
+    if(rangingTable->ERb.seqNumber + 1 == rangingTable->Rb.seqNumber && rangingTable->ERp.seqNumber + 1 == rangingTable->Rp.seqNumber) {
         if(rangingTable->continuitySign == false) {
             rangingTable->continuitySign = true;
             // correcting PTof
@@ -184,11 +188,12 @@ void fillRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr, Times
     +------+------+------+------+------+------+
                       <-- Rr <-- Tf
 */
-void replaceRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr, Timestamp_Tuple_t Rr, Timestamp_Tuple_t Tf, Timestamp_Tuple_t Rf, float PTof) {
+void replaceRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr, Timestamp_Tuple_t Rr, Timestamp_Tuple_t Tf, Timestamp_Tuple_t Rf, Timestamp_Tuple_t Re, float PTof) {
     rangingTable->Tb = Tr;
     rangingTable->Rb = Rr;
     rangingTable->Tp = Tf;
     rangingTable->Rp = Rf;
+    rangingTable->Rr = Re;
     rangingTable->PTof = PTof;
     rangingTable->continuitySign = false;
 }
@@ -277,8 +282,7 @@ first step:
     // check orderliness
     if(!(rangingTable->Rb.timestamp.full < rangingTable->Tp.timestamp.full && rangingTable->Tp.timestamp.full < Rr.timestamp.full
         && rangingTable->Tb.timestamp.full < rangingTable->Rp.timestamp.full && rangingTable->Rp.timestamp.full < Tr.timestamp.full)) {
-        // should be in order
-        assert(0 && "Warning: Should not be called\n");
+        DEBUG_PRINT("Warning: Data calculation is not in order\n");
     }
 
     int64_t Ra1 = (rangingTable->Rp.timestamp.full - rangingTable->Tb.timestamp.full + UWB_MAX_TIMESTAMP) % UWB_MAX_TIMESTAMP;

@@ -64,50 +64,127 @@ This script will generate a plot of the adjusted data and save it as `data.png`.
 - `lock`: Provides a thread-safe locking mechanism for message processing to ensure data consistency in multithreaded environments.
 - `debug`: Defines the `DEBUG_PRINT` function to assist with debugging and development.
 
-## Computation Process
+## Process
+### kind of message
+- `Tx`      (1) --->
+- `Rx`      (2) <--- 
+- `Rx_NO`   (3) <--- (without Rx)
+
+### state transition
+            +------+------+------+------+------+            
+            |  Tb  |  Rp  |      |      |      |   ----+
+    +--->   +------+------+------+------+------+       |   (2) Rx(impossible) / (3) Rx_NO
+    |       |  Rb  |  Tp  |  Rr  |      |      |   <---+
+    |       +------+------+------+------+------+   ----+        
+    |                                                  |   (1) Tx
+    |       +------+------+------+------+------+   <---+                            +------+------+------+------+------+
+    |       |  Tb  |  Rp  |      |      |      |   ----+------------------------>   |  Tb  |  Rp  | [Tr] |      |      |
+    |       +------+------+------+------+------+       |   (1) Tx       (3) Rx_NO   +------+------+------+------+------+
+    |       |  Rb  |  Tp  |  Rr  | [Tf] |      |   <---+-------------------------   |  Rb  |  Tp  |  Rr  | [Tf] | [Re] |
+    |       +------+------+------+------+------+   ----+                            +------+------+------+------+------+
+    |                                                  |   (2) Rx
+    |       +------+------+------+------+------+   <---+
+    |       |  Tb  |  Rp  | [Tr] | [Rf] |      |    
+    +----   +------+------+------+------+------+
+            |  Rb  |  Tp  |  Rr  | [Tf] | [Re] |
+            +------+------+------+------+------+
+
 ### initialize
-+------+------+------+------+------+------+------+
-| ETb  | ERp  |  Tb  |  Rp  | [Tr] | [Rf] |      |
-+------+------+------+------+------+------+------+
-| ERb  | ETp  |  Rb  |  Tp  | (Rr) | [Tf] | [Re] |
-+------+------+------+------+------+------+------+
-- **normal**: calculate and shift
-+------+------+------+------+------+------+------+
-|  Tb  |  Rp  |  Tr  |  Rf  |      |      |      |
-+------+------+------+------+------+------+------+
-|  Rb  |  Tp  |  Rr  |  Tf  | (Re) |      |      |
-+------+------+------+------+------+------+------+
-- **not enough data for calculation**: shift{add mechanism to detect whether the timestamp is complete}
-+------+------+------+------+------+------+------+
-|  Tb  |  Rp  |  Tr  |  Rf  |      |      |      |
-+------+------+------+------+------+------+------+
-|  Rb  |  Tp  |  Rr  |  Tf  | (Re) |      |      |
-+------+------+------+------+------+------+------+
-- **lossing packet**: recalculate
-+------+------+------+------+------+------+------+
-| ETb  | ERp  |  Tb  |  Rp  |      |      |      |
-+------+------+------+------+------+------+------+
-| ERb  | ETp  |  Rb  |  Tp  | (Re) |      |      |
-+------+------+------+------+------+------+------+
+- **normal**: 
+solution: calculate --> shift --> fill in
+use Tp, Rp, Tr, Rr, Tf, Rf
++------+------+------+------+------+
+|  Tr  |  Rf  |      |      |      |
++------+------+------+------+------+
+|  Rr  |  Tf  |  Re  |      |      |
++------+------+------+------+------+
+- **initialization**
+solution: shift --> fill in
++------+------+------+------+------+
+|  Tr  |  Rf  |      |      |      |
++------+------+------+------+------+
+|  Rr  |  Tf  |  Re  |      |      |
++------+------+------+------+------+
+- **orderliness**
+- *backup*
+use Tp, Rp, backupTr, backupRr, Tf, Rf
++------+------+------+------+------+
+| bkTr |  Rf  |      |      |      |
++------+------+------+------+------+
+| bkRr |  Tf  |  Re  |      |      |
++------+------+------+------+------+
+- *extra node*
+- [type_1]: use ETp, ERp, Tr, Rr, Tf, Rf
+Tb           Tr     Rp           Rf
+
+    Rb     Tp           Rr     Tf
++------+------+------+------+------+
+|  Tr  |  Rf  |      |      |      |
++------+------+------+------+------+
+|  Rr  |  Tf  |  Re  |      |      |
++------+------+------+------+------+
+- [type_2]: use Tb, Rb, Tp, Rp, Tr, Rr
+Tb           Rp     Tr           Rf
+    
+    Rb     Tp           Tf     Rr
++------+------+------+------+------+
+|  Tb  |  Rf  |      |      |      |
++------+------+------+------+------+
+|  Rb  |  Tf  |  Re  |      |      |
++------+------+------+------+------+
+- **lossing packet**
+Tf and Rf are full  =>  use ETp, ERp, Tb, Rb, Tf, Rf
+Tr and Rr are full  =>  use Tb, Rb, Tp, Rp, Tr, Rr
++------+------+------+------+------+
+|  Tb  |  Rp  |      |      |      |
++------+------+------+------+------+
+|  Rb  |  Tp  |  Rr  |      |      |
++------+------+------+------+------+
 
 ### calculate
-+------+------+------+------+------+------+------+
-| ETb  | ERp  |  Tb  |  Rp  | [Tr] | [Rf] |      |
-+------+------+------+------+------+------+------+
-| ERb  | ETp  |  Rb  |  Tp  | (Rr) | [Tf] | [Re] |
-+------+------+------+------+------+------+------+
-- **normal**: calculate and shift
-+------+------+------+------+------+------+------+
-|  Tb  |  Rp  |  Tr  |  Rf  |      |      |      |
-+------+------+------+------+------+------+------+
-| ERb  |  Tp  |  Rr  |  Tf  | (Re) |      |      |
-+------+------+------+------+------+------+------+
-- **lossing packet**: recalculate{recalculate=>fill in PTof, SECOND_CALCULATE}
-+------+------+------+------+------+------+------+
-| ETb  | ERp  |  Tb  |  Rp  |      |      |      |
-+------+------+------+------+------+------+------+
-| ERb  | ETp  |  Rb  |  Tp  | (Re) |      |      |
-+------+------+------+------+------+------+------+
+- **normal**: 
+solution: calculate --> shift --> fill in
+use Tb, Rb, Tp, Rp, Tr, Rr, Tf, Rf
++------+------+------+------+------+
+|  Tr  |  Rf  |      |      |      |
++------+------+------+------+------+
+|  Rr  |  Tf  |  Re  |      |      |
++------+------+------+------+------+
+- **orderliness**
+- *backup*
+use Tb, Rb, Tp, Rp, backupTr, backupRr, Tf, Rf
++------+------+------+------+------+
+| bkTr |  Rf  |      |      |      |
++------+------+------+------+------+
+| bkRr |  Tf  |  Re  |      |      |
++------+------+------+------+------+
+- *extra node*
+- [type_1]: use ETp, ERp, Tr, Rr, Tf, Rf
+Tb           Tr     Rp           Rf
+
+    Rb     Tp           Rr     Tf
++------+------+------+------+------+
+|  Tr  |  Rf  |      |      |      |
++------+------+------+------+------+
+|  Rr  |  Tf  |  Re  |      |      |
++------+------+------+------+------+
+- [type_2]: use Tb, Rb, Tp, Rp, Tr, Rr
+Tb           Rp     Tr           Rf
+    
+    Rb     Tp           Tf     Rr
++------+------+------+------+------+
+|  Tb  |  Rf  |      |      |      |
++------+------+------+------+------+
+|  Rb  |  Tf  |  Re  |      |      |
++------+------+------+------+------+
+- **lossing packet**
+Tf and Rf are full  =>  use ETp, ERp, Tb, Rb, Tf, Rf
+Tr and Rr are full  =>  use Tb, Rb, Tp, Rp, Tr, Rr
++------+------+------+------+------+
+|  Tb  |  Rp  |      |      |      |
++------+------+------+------+------+
+|  Rb  |  Tp  |  Rr  |      |      |
++------+------+------+------+------+
 
 ## Configuration
 The project can be configured through preprocessor directives in the source code. For example, you can enable or disable features such as dynamic ranging frequency, packet loss simulation, and position sending by defining or undefining the corresponding macros in the source files.

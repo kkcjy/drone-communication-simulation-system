@@ -127,7 +127,7 @@ void checkExpiration(Ranging_Table_Set_t *rangingTableSet);
 table_index_t findRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t address);
 void shiftRangingTable(Ranging_Table_t *rangingTable);
 void fillRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr, Timestamp_Tuple_t Rr, Timestamp_Tuple_t Tf, Timestamp_Tuple_t Rf, Timestamp_Tuple_t Re, float PTof);
-void replaceRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr, Timestamp_Tuple_t Rr, Timestamp_Tuple_t Tf, Timestamp_Tuple_t Rf, float PTof);
+void replaceRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr, Timestamp_Tuple_t Rr, Timestamp_Tuple_t Tf, Timestamp_Tuple_t Rf, Timestamp_Tuple_t Re, float PTof);
 float assistedCalculatePTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr, Timestamp_Tuple_t Rr, Timestamp_Tuple_t Tf, Timestamp_Tuple_t Rf);
 float calculatePTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr, Timestamp_Tuple_t Rr, Timestamp_Tuple_t Tf, Timestamp_Tuple_t Rf, CalculateState state);
 void printRangingMessage(Ranging_Message_t *rangingMessage);
