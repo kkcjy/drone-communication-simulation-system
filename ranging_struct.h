@@ -100,6 +100,7 @@ typedef struct {
 
     bool continuitySign;                // true: contiguous | false: non-contiguous
     bool expirationSign;                // true: no recent access --> expired | recent access --> not expired
+    int8_t initCalculateRound;          // used for initCalculatePTof
 
     TableState state;                   // UNUSED / USING
 } __attribute__((packed)) Ranging_Table_t;

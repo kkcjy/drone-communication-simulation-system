@@ -18,6 +18,7 @@ void rangingTableInit(Ranging_Table_t *rangingTable) {
     rangingTable->EPTof = NULL_TOF;
     rangingTable->continuitySign = false;
     rangingTable->expirationSign = true;
+    rangingTable->initCalculateRound = 0;
     rangingTable->state = UNUSED;
 }
 
@@ -108,9 +109,11 @@ table_index_t findRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t ad
         // DEBUG_PRINT("Ranging table Set is empty, cannot find table\n");
         return NULL_INDEX;
     }
-    for (table_index_t index = 0; index < rangingTableSet->counter; index++) {
-        if (rangingTableSet->rangingTable[index].neighborAddress == address) {
-            return index;
+
+    for (table_index_t i = 0; i < rangingTableSet->counter; i++) {
+        table_index_t idx = rangingTableSet->priorityQueue[i];
+        if (rangingTableSet->rangingTable[idx].neighborAddress == address) {
+            return idx;
         }
     }
     // DEBUG_PRINT("Ranging table Set does not contain the address: %u\n", address);

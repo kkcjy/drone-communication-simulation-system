@@ -5,7 +5,6 @@
 
 static uint16_t MY_UWB_ADDRESS;
 Ranging_Table_Set_t *rangingTableSet;
-static int8_t initCalculateRound = 0;
 #ifdef COMPENSATE_ENABLE
 static float lastD = 0;
 #endif
@@ -193,7 +192,7 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
 
     // backupTr and backupRr are used for dealing with order problem
     Timestamp_Tuple_t Rr = rangingTableSet->lastRxtimestamp[neighborIndex];
-    /*  Rr              - calculate successfully -> update
+    /*  Rr              - calculate normalfully -> update
         lastRxtimestamp - receive message        -> update
     */
     Timestamp_Tuple_t backupRr = (rangingTable->Rr.seqNumber == rangingTableSet->lastRxtimestamp[neighborIndex].seqNumber) ? nullTimestampTuple : rangingTable->Rr;
@@ -219,15 +218,15 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
         | ERb  | ETp  |  Rb  |  Tp  |  Rr  |  Tf  |  Re  |
         +------+------+------+------+------+------+------+
     */
-    if(initCalculateRound < INIT_CALCULATION_ROUNDS) {
+    if(rangingTable->initCalculateRound < INIT_CALCULATION_ROUNDS) {
         float initPTof = assistedCalculatePTof(rangingTable, Tr, Rr, Tf, Rf);
 
-        // success
+        // normal
         if(initPTof != NULL_TOF && initPTof != MISORDER_SIGN && initPTof != INCOMPLETE_SIGN) {
-            initCalculateRound++;
+            rangingTable->initCalculateRound++;
             shiftRangingTable(rangingTable);
             fillRangingTable(rangingTable, Tr, Rr, Tf, Rf, Re, initPTof);
-            if(initCalculateRound == INIT_CALCULATION_ROUNDS) {
+            if(rangingTable->initCalculateRound == INIT_CALCULATION_ROUNDS) {
                 DEBUG_PRINT("[initCalculatePTof]: finish calling\n");
             }
         }
@@ -285,7 +284,7 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
         // problem of completeness
         else if(initPTof == INCOMPLETE_SIGN) {
             // data loss caused by initializing   ---> update
-            if(initCalculateRound == 0) {
+            if(rangingTable->initCalculateRound == 0) {
                 DEBUG_PRINT("Date loss caused by initializing --> update rangingTable\n");
                 // ensure data completeness
                 if(!(Tr.seqNumber == NULL_SEQ || Rr.seqNumber == NULL_SEQ || Tf.seqNumber == NULL_SEQ || Rf.seqNumber == NULL_SEQ)) {
@@ -333,8 +332,8 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
         
         // recalculation failed, use the Tof calculated last time
         if(initPTof == NULL_TOF || initPTof == MISORDER_SIGN || initPTof == INCOMPLETE_SIGN) {
-            initPTof = rangingTable->PTof;
             DEBUG_PRINT("Warning: recalculation failed\n");
+            initPTof = rangingTable->PTof;
         }
 
         // print result
@@ -362,7 +361,7 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
     else {
         float ModifiedPTof = calculatePTof(rangingTable, Tr, Rr, Tf, Rf, FIRST_CALCULATE);
 
-        // success
+        // normal
         if(ModifiedPTof != NULL_TOF && ModifiedPTof != MISORDER_SIGN && ModifiedPTof != INCOMPLETE_SIGN) {
             shiftRangingTable(rangingTable);
             fillRangingTable(rangingTable, Tr, Rr, Tf, Rf, Re, ModifiedPTof);
@@ -383,7 +382,8 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
                     fillRangingTable(rangingTable, backupTr, backupRr, Tf, Rf, Re, ModifiedPTof);
                 }
             }
-            else {
+            // use extra node   -->     replace
+            if(ModifiedPTof == NULL_TOF || ModifiedPTof == MISORDER_SIGN || ModifiedPTof == INCOMPLETE_SIGN) {
                 DEBUG_PRINT("No suitable backupTimestamp found for recalculation\n");
                 /* type_1: ETp, ERp, Tr, Rr, Tf, Rf
                     Tb           Tr     Rp           Rf
@@ -443,7 +443,7 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
                 tmpRangingTable.PTof = (rangingTable->PTof + rangingTable->EPTof) / 2;
                 ModifiedPTof = calculatePTof(&tmpRangingTable, Tf, Rf, nullTimestampTuple, nullTimestampTuple, SECOND_CALCULATE);
             }
-            
+
             /* Tr and Rr are full  =>  using Tb, Rb, Tp, Rp, Tr, Rr
             +------+------+------+------+------+------+
             | ETb  | ERp  |  Tb  |  Rp  |  Tr  |      |
