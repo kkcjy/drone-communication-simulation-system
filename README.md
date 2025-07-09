@@ -113,8 +113,8 @@ This script will generate a plot of the adjusted data and save it as `data.png`.
   - **Backup** 
     -  `{Tp, Rp, backupTr, backupRr, Tf, Rf}`
   - **Extra Node**
-    1. `Tr < Rp  =>  {ETp, ERp, Tr, Rr, Tf, Rf}`
-    2. `Tf < Rr  =>  {Tb, Rb, Tp, Rp, Tr, Rr}`
+    - `Tr < Rp  =>  {ETp, ERp, Tr, Rr, Tf, Rf}`
+    - `Tf < Rr  =>  {Tb, Rb, Tp, Rp, Tr, Rr}`
 ```plaintext
 Back up:
 Tb           Rp     Tr           Rf
@@ -146,8 +146,8 @@ Tb           Rp     Tr           Rf
 +------+------+------+------+------+
 ```
 - **Lossing Packet**
-  1. `Tf and Rf are full  =>  {ETp, ERp, Tb, Rb, Tf, Rf}`
-  2. `Tr and Rr are full  =>  {Tb, Rb, Tp, Rp, Tr, Rr}`
+  - `Tf and Rf are full  =>  {ETp, ERp, Tb, Rb, Tf, Rf}`
+  - `Tr and Rr are full  =>  {Tb, Rb, Tp, Rp, Tr, Rr}`
 ```plaintext
 +------+------+------+------+------+
 |  Tb  |  Rp  |      |      |      |
@@ -170,8 +170,8 @@ Tb           Rp     Tr           Rf
   - **Backup**
     - `{Tb, Rb, Tp, Rp, backupTr, backupRr, Tf, Rf}`
   - **Extra Node**
-    1. `Tr < Rp  =>  {ETp, ERp, Tr, Rr, Tf, Rf}`
-    2. `Tf < Rr  =>  {Tb, Rb, Tp, Rp, Tr, Rr}`
+    - `Tr < Rp  =>  {ETp, ERp, Tr, Rr, Tf, Rf}`
+    - `Tf < Rr  =>  {Tb, Rb, Tp, Rp, Tr, Rr}`
 ```plaintext
 Back up:
 Tb           Rp     Tr           Rf
