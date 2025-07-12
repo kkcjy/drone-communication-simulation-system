@@ -58,51 +58,97 @@ This script will generate a plot of the adjusted data and save it as `data.png`.
 - **`local_host`**: Initializes the local host, including address, base time, location, and velocity, providing the system’s basic configuration.
 - **`ranging_struct`**: Defines all necessary types and data structures used throughout the project.
 - **`ranging_protocol`**: Core module for ranging, responsible for table initialization, updating, running the ranging algorithm, and handling related logic.
+- **`queue_task`**: Provides a thread-safe locking mechanism for message processing to ensure data consistency in multithreaded environments.
+- **`ranging_local_support`**: Construct an environment and functions suitable for local execution.
 - **`socket_frame`**: Implements the socket communication framework, including message structures and constants, enabling data exchange between the drone simulator and the control center.
 - **`drone`**: Simulates drone behavior, handling message sending, receiving, and processing using the socket framework.
 - **`center_control`**: Manages the control center, including drone connections, message broadcasting, and drone list management, overseeing the entire system.
 - **`data_process`**: Processes and visualizes simulation data by reading files, calculating offsets, and generating plots to help analyze algorithm performance.
-- **`lock`**: Provides a thread-safe locking mechanism for message processing to ensure data consistency in multithreaded environments.
-- **`debug`**: Defines the `DEBUG_PRINT` function to assist with debugging and development.
 
 ## ⚙️ Process
 
 ### 1. Kind of Message
-- `Tx, Rx, Rx_NO`
+- `TX, RX, RX_NO`
 
 ### 2. State Transition
 ```plaintext
             +------+------+------+------+------+            
-            |  Tb  |  Rp  |      |      |      |   ----+
-    +--->   +------+------+------+------+------+       |   (2) Rx(impossible) / (3) Rx_NO
+            |      |      |      |      |  S1  |   ----+
+            +------+------+------+------+------+       |   (2) RX(impossible) / (3) RX_NO
+            |      |      |      |      |      |   <---+
+            +------+------+------+------+------+   ----+        
+                                                       |   (1) TX
+            +------+------+------+------+------+   <---+                                +------+------+------+------+------+
+            |      |      |      |      |  S2  |   ----+----------------------------+   |      |      |      |      |  S3  |
+            +------+------+------+------+------+       |   (1) TX       (3) RX_NO   |   +------+------+------+------+------+
+            |      |      |      | [Tf] |      |   <---+----------------------------+   |      |      |      | [Tf] | [Re] |
+            +------+------+------+------+------+   ----+                                +------+------+------+------+------+
+                                                       |   (2) RX
+            +------+------+------+------+------+   <---+
+            |      |      |      | [Rf] |  S3  |    
+            +------+------+------+------+------+
+            |      |      |      | [Tf] | [Re] |
+            +------+------+------+------+------+   ----+
+                                                       |   shift
+            +------+------+------+------+------+   <---+         
+            |      |  Rp  |      |      |  S4  |   ----+
+            +------+------+------+------+------+       |   (2) RX(impossible) / (3) RX_NO
+            |      |  Tp  |  Rr  |      |      |   <---+
+            +------+------+------+------+------+   ----+        
+                                                       |   (1) TX
+            +------+------+------+------+------+   <---+                                +------+------+------+------+------+
+            |      |  Rp  |      |      |  S5  |   ----+----------------------------+   |      |  Rp  | [Tr] |      |  S6  |
+            +------+------+------+------+------+       |   (1) TX       (3) RX_NO   |   +------+------+------+------+------+
+            |      |  Tp  |  Rr  | [Tf] |      |   <---+----------------------------+   |      |  Tp  |  Rr  | [Tf] | [Re] |
+            +------+------+------+------+------+   ----+                                +------+------+------+------+------+
+                                                       |   (2) RX
+            +------+------+------+------+------+   <---+
+            |      |  Rp  | [Tr] | [Rf] |  S6  |    
+            +------+------+------+------+------+
+            |      |  Tp  |  Rr  | [Tf] | [Re] |
+            +------+------+------+------+------+   ----+
+                                                       |   shift
+            +------+------+------+------+------+   <---+
+            |  Tb  |  Rp  |      |      |  S4  |   ----+
+    +--->   +------+------+------+------+------+       |   (2) RX(impossible) / (3) RX_NO
     |       |  Rb  |  Tp  |  Rr  |      |      |   <---+
-    |       +------+------+------+------+------+   ----+        
-    |                                                  |   (1) Tx
+    |       +------+------+------+------+------+   ----+
+    |                                                  |   (1) TX
     |       +------+------+------+------+------+   <---+                                +------+------+------+------+------+
-    |       |  Tb  |  Rp  |      |      |      |   ----+----------------------------+   |  Tb  |  Rp  | [Tr] |      |      |
-    |       +------+------+------+------+------+       |   (1) Tx       (3) Rx_NO   |   +------+------+------+------+------+
+    |       |  Tb  |  Rp  |      |      |  S5  |   ----+----------------------------+   |  Tb  |  Rp  | [Tr] |      |  S6  |
+    |       +------+------+------+------+------+       |   (1) TX       (3) RX_NO   |   +------+------+------+------+------+
     |       |  Rb  |  Tp  |  Rr  | [Tf] |      |   <---+----------------------------+   |  Rb  |  Tp  |  Rr  | [Tf] | [Re] |
     |       +------+------+------+------+------+   ----+                                +------+------+------+------+------+
-    |                                                  |   (2) Rx
+    |                                                  |   (2) RX
     |       +------+------+------+------+------+   <---+
-    |       |  Tb  |  Rp  | [Tr] | [Rf] |      |    
+    |       |  Tb  |  Rp  | [Tr] | [Rf] |  S6  |    
     +----   +------+------+------+------+------+
             |  Rb  |  Tp  |  Rr  | [Tf] | [Re] |
             +------+------+------+------+------+
 ```
 
 ### 3. Initialize
-- **Normal**: 
-`{Tp, Rp, Tr, Rr, Tf, Rf}`
+- **Initialization**
 ```plaintext
+null         null   Tr           Rf
+    
+   null   null         Rr     Tf           Re
+   
+- shift and fill -
 +------+------+------+------+------+
 | -Tr- | -Rf- |      |      |      |
 +------+------+------+------+------+
 | -Rr- | -Tf- | -Re- |      |      |
 +------+------+------+------+------+
 ```
-- **Initialization**
+- **Normal**: 
+`{Tp, Rp, Tr, Rr, Tf, Rf} => Tof`
 ```plaintext
+Tb           Rp     Tr           Rf
+    
+   Rb     Tp           Rr     Tf           Re
+
+- shift and fill -
 +------+------+------+------+------+
 | -Tr- | -Rf- |      |      |      |
 +------+------+------+------+------+
@@ -111,15 +157,17 @@ This script will generate a plot of the adjusted data and save it as `data.png`.
 ```
 - **Orderliness**
   - **Backup** 
-    -  `{Tp, Rp, backupTr, backupRr, Tf, Rf}`
+    -  `{Tp, Rp, backupTr, backupRr, Tf, Rf} => Tof`
   - **Extra Node**
-    - `Tr < Rp  =>  {ETp, ERp, Tr, Rr, Tf, Rf}`
-    - `Tf < Rr  =>  {Tb, Rb, Tp, Rp, Tr, Rr}`
+    - `Tr < Rp  =>  {ETp, ERp, Tr, Rr, Tf, Rf} => Tof`
+    - `Tf < Rr  =>  {Tb, Rb, Tp, Rp, Tr, Rr} => Tof`
 ```plaintext
 Back up:
 Tb           Rp     Tr           Rf
     
-   Rb     Tp           Tf     Rr
+   Rb     Tp           Tf     Rr           Re
+
+- shift and fill -
 +------+------+------+------+------+
 |-bkTr-| -Rf- |      |      |      |
 +------+------+------+------+------+
@@ -129,7 +177,9 @@ Tb           Rp     Tr           Rf
 Extra Node(Tr < Rp):
 Tb           Tr     Rp           Rf                 
 
-   Rb     Tp           Rr     Tf                    
+   Rb     Tp           Rr     Tf           Re
+
+- replace -
 +------+------+------+------+------+                
 | -Tr- | -Rf- |      |      |      |                
 +------+------+------+------+------+               
@@ -138,7 +188,10 @@ Tb           Tr     Rp           Rf
 
 Extra Node(Tf < Rr):
 Tb           Rp     Tr           Rf
-   Rb     Tp           Tf     Rr          
+
+   Rb     Tp           Tf     Rr           Re
+
+- replace -
 +------+------+------+------+------+
 |  Tb  | -Rf- |      |      |      |
 +------+------+------+------+------+
@@ -146,9 +199,20 @@ Tb           Rp     Tr           Rf
 +------+------+------+------+------+
 ```
 - **Lossing Packet**
-  - `Tf and Rf are full  =>  {ETp, ERp, Tb, Rb, Tf, Rf}`
-  - `Tr and Rr are full  =>  {Tb, Rb, Tp, Rp, Tr, Rr}`
+  - `Tf and Rf are full  =>  {ETp, ERp, Tb, Rb, Tf, Rf} => Tof`
+  - `Tr and Rr are full  =>  {Tb, Rb, Tp, Rp, Tr, Rr} => Tof`
 ```plaintext
+(Tf and Rf are full)
+Tb           Rp     null         Rf
+
+   Rb     Tp           Tf     Rr           Re
+
+(Tr and Rr are full)
+Tb           Rp     Tr           null
+
+   Rb     Tp           Tf     Rr           Re
+
+- unupdate -
 +------+------+------+------+------+
 |  Tb  |  Rp  |      |      |      |
 +------+------+------+------+------+
@@ -158,8 +222,13 @@ Tb           Rp     Tr           Rf
 
 ### 4. Calculate
 - **Normal**: 
-`{Tb, Rb, Tp, Rp, Tr, Rr, Tf, Rf}`
+`{Tb, Rb, Tp, Rp, Tr, Rr, Tf, Rf} => Tof`
 ```plaintext
+Tb           Rp     Tr           Rf
+    
+   Rb     Tp           Rr     Tf           Re
+
+- shift and fill -
 +------+------+------+------+------+
 | -Tr- | -Rf- |      |      |      |
 +------+------+------+------+------+
@@ -168,15 +237,17 @@ Tb           Rp     Tr           Rf
 ```
 - **Orderliness**
   - **Backup**
-    - `{Tb, Rb, Tp, Rp, backupTr, backupRr, Tf, Rf}`
+    - `{Tb, Rb, Tp, Rp, backupTr, backupRr, Tf, Rf} => Tof`
   - **Extra Node**
-    - `Tr < Rp  =>  {ETp, ERp, Tr, Rr, Tf, Rf}`
-    - `Tf < Rr  =>  {Tb, Rb, Tp, Rp, Tr, Rr}`
+    - `Tr < Rp  =>  {ETp, ERp, Tr, Rr, Tf, Rf} => Tof`
+    - `Tf < Rr  =>  {Tb, Rb, Tp, Rp, Tr, Rr} => Tof`
 ```plaintext
 Back up:
 Tb           Rp     Tr           Rf
     
-   Rb     Tp           Tf     Rr
+   Rb     Tp           Tf     Rr           Re
+
+- shift and fill -
 +------+------+------+------+------+
 |-bkTr-| -Rf- |      |      |      |
 +------+------+------+------+------+
@@ -186,7 +257,9 @@ Tb           Rp     Tr           Rf
 Extra Node(Tr < Rp):
 Tb           Tr     Rp           Rf
 
-   Rb     Tp           Rr     Tf
+   Rb     Tp           Rr     Tf           Re
+
+- replace -
 +------+------+------+------+------+
 |  Tr  |  Rf  |      |      |      |
 +------+------+------+------+------+
@@ -196,7 +269,9 @@ Tb           Tr     Rp           Rf
 Extra Node(Tf < Rr):
 Tb           Rp     Tr           Rf
     
-   Rb     Tp           Tf     Rr
+   Rb     Tp           Tf     Rr           Re
+
+- replace -
 +------+------+------+------+------+
 |  Tb  |  Rf  |      |      |      |
 +------+------+------+------+------+
@@ -204,9 +279,20 @@ Tb           Rp     Tr           Rf
 +------+------+------+------+------+
 ```
 - **Lossing Packet**
-  - `Tf and Rf are full  =>  {ETp, ERp, Tb, Rb, Tf, Rf}`
-  - `Tr and Rr are full  =>  {Tb, Rb, Tp, Rp, Tr, Rr}`
+  - `Tf and Rf are full  =>  {ETp, ERp, Tb, Rb, Tf, Rf} => Tof`
+  - `Tr and Rr are full  =>  {Tb, Rb, Tp, Rp, Tr, Rr} => Tof`
 ```plaintext
+(Tf and Rf are full)
+Tb           Rp     null         Rf
+
+   Rb     Tp           Tf     Rr           Re
+
+(Tr and Rr are full)
+Tb           Rp     Tr           null
+
+   Rb     Tp           Tf     Rr           Re
+
+- unupdate -
 +------+------+------+------+------+
 |  Tb  |  Rp  |      |      |      |
 +------+------+------+------+------+

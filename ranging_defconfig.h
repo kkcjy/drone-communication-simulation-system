@@ -4,6 +4,7 @@
 // #define         CLASSIC_TOF_ENABLE
 #define         COORDINATE_SEND_ENABLE
 // #define         COMPENSATE_ENABLE
+#define         STATE_MACHINE_ENABLE
 
 #define         COMPENSATE_RATE             0.5
 

@@ -13,6 +13,7 @@ void updateSendList(SendList_t *sendList, Timestamp_Tuple_t timestampTuple, Coor
 #else
 void updateSendList(SendList_t *sendList, Timestamp_Tuple_t timestampTuple);
 #endif
+typedef void (*EventHandlerTable)(Ranging_Table_t *);
 Time_t generateMessage(Ranging_Message_t *rangingMessage);
 void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAdditionalInfo);
 

@@ -13,6 +13,9 @@
         "stdbool.h": "c",
         "array": "c",
         "string": "c",
-        "string_view": "c"
+        "string_view": "c",
+        "socket_frame.h": "c",
+        "ranging_support.h": "c",
+        "queue_task.h": "c"
     }
 }

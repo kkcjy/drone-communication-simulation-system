@@ -10,6 +10,7 @@ static float lastD = 0;
 #endif
 
 
+// -------------------- Ranging Table Set Operation --------------------
 void rangingTableSetInit() {
     MY_UWB_ADDRESS = uwbGetAddress();
 
@@ -79,6 +80,161 @@ void updatePriority(Ranging_Table_Set_t *rangingTableSet, uint16_t address) {
     }
 }
 
+
+// -------------------- State Machine Operation --------------------
+static void RESERVED_STUB(Ranging_Table_t *rangingTable) {
+    assert(0 && "[RESERVED_STUB]: Should not be called\n");
+}
+
+static void S1_TX(Ranging_Table_t *rangingTable) {
+    // Don't update Tx here since sending message is an async action, we put all Tx in sendList
+    RANGING_TABLE_STATE prevState = rangingTable->rangingState;
+    rangingTable->rangingState = RANGING_STATE_S2;
+    RANGING_TABLE_STATE curState = rangingTable->rangingState;
+
+    DEBUG_PRINT("[S1_TX]: S%d -> S%d\n", prevState, curState);
+}
+
+static void S1_RX(Ranging_Table_t *rangingTable) {
+    // Invalid reception of rangingMessage
+    RANGING_TABLE_STATE prevState = rangingTable->rangingState;
+    rangingTable->rangingState = RANGING_STATE_S1;
+    RANGING_TABLE_STATE curState = rangingTable->rangingState;
+
+    DEBUG_PRINT("[S1_RX_NO]: S%d -> S%d\n", prevState, curState);
+}
+
+static void S1_RX_NO(Ranging_Table_t *rangingTable) {
+    // Invalid reception of rangingMessage
+    RANGING_TABLE_STATE prevState = rangingTable->rangingState;
+    rangingTable->rangingState = RANGING_STATE_S1;
+    RANGING_TABLE_STATE curState = rangingTable->rangingState;
+
+    DEBUG_PRINT("[S1_RX_NO]: S%d -> S%d\n", prevState, curState);
+}
+
+static void S2_TX(Ranging_Table_t *rangingTable) {
+    // Don't update Tx here since sending message is an async action, we put all Tx in sendList
+    RANGING_TABLE_STATE prevState = rangingTable->rangingState;
+    rangingTable->rangingState = RANGING_STATE_S2;
+    RANGING_TABLE_STATE curState = rangingTable->rangingState;
+
+    DEBUG_PRINT("[S2_TX]: S%d -> S%d\n", prevState, curState);
+}
+
+static void S2_RX(Ranging_Table_t *rangingTable) {
+    // Data in rangingTable shift and fill quickly, directly skipping S3 and entering S4
+    RANGING_TABLE_STATE prevState = rangingTable->rangingState;
+    rangingTable->rangingState = RANGING_STATE_S4;
+    RANGING_TABLE_STATE curState = rangingTable->rangingState;
+
+    DEBUG_PRINT("[S2_RX]: S%d -> S%d\n", prevState, curState);
+}
+
+static void S2_RX_NO(Ranging_Table_t *rangingTable) {
+    // Lack of timestamp, no need to update rangingTable content
+    RANGING_TABLE_STATE prevState = rangingTable->rangingState;
+    rangingTable->rangingState = RANGING_STATE_S2;
+    RANGING_TABLE_STATE curState = rangingTable->rangingState;
+
+    DEBUG_PRINT("[S2_RX_NO]: S%d -> S%d\n", prevState, curState);
+}
+
+static void S3_TX(Ranging_Table_t *rangingTable) {
+    assert(0 && "[S3_TX]: Should not be called\n");
+}
+
+static void S3_RX(Ranging_Table_t *rangingTable) {
+    assert(0 && "[S3_RX]: Should not be called\n");
+}
+
+static void S3_RX_NO(Ranging_Table_t *rangingTable) {
+    assert(0 && "[S3_RX_NO]: Should not be called\n");
+}
+
+static void S4_TX(Ranging_Table_t *rangingTable) {
+    // Don't update Tx here since sending message is an async action, we put all Tx in sendList
+    RANGING_TABLE_STATE prevState = rangingTable->rangingState;
+    rangingTable->rangingState = RANGING_STATE_S5;
+    RANGING_TABLE_STATE curState = rangingTable->rangingState;
+
+    DEBUG_PRINT("[S4_TX]: S%d -> S%d\n", prevState, curState);
+}
+
+static void S4_RX(Ranging_Table_t *rangingTable) {
+    // Calculate Tof, but not shift and fill rangingTable
+    RANGING_TABLE_STATE prevState = rangingTable->rangingState;
+    rangingTable->rangingState = RANGING_STATE_S4;
+    RANGING_TABLE_STATE curState = rangingTable->rangingState;
+    
+    DEBUG_PRINT("[S4_RX]: S%d -> S%d\n", prevState, curState);
+}
+
+static void S4_RX_NO(Ranging_Table_t *rangingTable) {
+    // Calculate Tof, but not shift and fill rangingTable
+    RANGING_TABLE_STATE prevState = rangingTable->rangingState;
+    rangingTable->rangingState = RANGING_STATE_S4;
+    RANGING_TABLE_STATE curState = rangingTable->rangingState;
+
+    DEBUG_PRINT("[S4_RX_NO]: S%d -> S%d\n", prevState, curState);
+}
+
+static void S5_TX(Ranging_Table_t *rangingTable) {
+    // Don't update Tx here since sending message is an async action, we put all Tx in sendList
+    RANGING_TABLE_STATE prevState = rangingTable->rangingState;
+    rangingTable->rangingState = RANGING_STATE_S5;
+    RANGING_TABLE_STATE curState = rangingTable->rangingState;
+
+    DEBUG_PRINT("[S5_TX]: S%d -> S%d\n", prevState, curState);
+}
+
+static void S5_RX(Ranging_Table_t *rangingTable) {
+    // Calculate Tof, shift and fill the rangingTable, calculation is quick, directly skipping S6 and entering S4
+    RANGING_TABLE_STATE prevState = rangingTable->rangingState;
+    rangingTable->rangingState = RANGING_STATE_S4;
+    RANGING_TABLE_STATE curState = rangingTable->rangingState;
+
+    DEBUG_PRINT("[S5_RX]: S%d -> S%d\n", prevState, curState);
+}
+
+static void S5_RX_NO(Ranging_Table_t *rangingTable) {
+    // Calculate Tof, but not shift and fill rangingTable
+    RANGING_TABLE_STATE prevState = rangingTable->rangingState;
+    rangingTable->rangingState = RANGING_STATE_S5;
+    RANGING_TABLE_STATE curState = rangingTable->rangingState;
+
+    DEBUG_PRINT("[S5_RX_NO]: S%d -> S%d\n", prevState, curState);
+}
+
+static void S6_TX(Ranging_Table_t *rangingTable) {
+    assert(0 && "[S6_TX]: Should not be called\n");
+}
+
+static void S6_RX(Ranging_Table_t *rangingTable) {
+    assert(0 && "[S6_RX]: Should not be called\n");
+}
+
+static void S6_RX_NO(Ranging_Table_t *rangingTable) {
+    assert(0 && "[S6_RX_NO]: Should not be called\n");
+}
+
+static EventHandlerTable EVENT_HANDLER[RANGING_TABLE_STATE_COUNT][RANGING_TABLE_EVENT_COUNT] = {
+    {RESERVED_STUB, RESERVED_STUB, RESERVED_STUB},
+    {S1_TX, S1_RX, S1_RX_NO},
+    {S2_TX, S2_RX, S2_RX_NO},
+    {S3_TX, S3_RX, S3_RX_NO},
+    {S4_TX, S4_RX, S4_RX_NO},
+    {S5_TX, S5_RX, S5_RX_NO},
+    {S6_TX, S6_RX, S6_RX_NO}
+};
+
+void RangingTableEventHandler(Ranging_Table_t *rangingTable, RANGING_TABLE_EVENT event)
+{
+    assert((rangingTable->rangingState < RANGING_TABLE_STATE_COUNT) && "Warning: Should not be called\n");
+    assert((event < RANGING_TABLE_EVENT_COUNT) && "Warning: Should not be called\n");
+    EVENT_HANDLER[rangingTable->rangingState][event](rangingTable);
+}
+
 Time_t generateMessage(Ranging_Message_t *rangingMessage) {
     Time_t taskDelay = M2T(RANGING_PERIOD);
 
@@ -96,6 +252,10 @@ Time_t generateMessage(Ranging_Message_t *rangingMessage) {
             bodyUnit->Rxtimestamp = rangingTableSet->lastRxtimestamp[index];
 
             rangingMessage->header.filter |= 1 << (rangingTableSet->rangingTable[index].neighborAddress % 16);
+            
+            // Si_TX
+            RangingTableEventHandler(&rangingTableSet->rangingTable[index], RANGING_EVENT_TX);
+            
             bodyUnitCount++;
         }
     }
@@ -189,7 +349,6 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
     }
 
     /* process header */
-
     // backupTr and backupRr are used for dealing with order problem
     Timestamp_Tuple_t Rr = rangingTableSet->lastRxtimestamp[neighborIndex];
     /*  Rr              - calculate normalfully -> update
@@ -223,9 +382,13 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
 
         // normal
         if(initPTof != NULL_TOF && initPTof != MISORDER_SIGN && initPTof != INCOMPLETE_SIGN) {
+            // S5_RX
+            RangingTableEventHandler(rangingTable, RANGING_EVENT_RX);
+
             rangingTable->initCalculateRound++;
             shiftRangingTable(rangingTable);
             fillRangingTable(rangingTable, Tr, Rr, Tf, Rf, Re, initPTof);
+
             if(rangingTable->initCalculateRound == INIT_CALCULATION_ROUNDS) {
                 DEBUG_PRINT("[initCalculatePTof]: finish calling\n");
             }
@@ -233,6 +396,9 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
 
         // problem of orderliness
         else if(initPTof == MISORDER_SIGN) {
+            // S5_RX
+            RangingTableEventHandler(rangingTable, RANGING_EVENT_RX);
+
             // use backup       -->     shift and fill
             if(backupTr.seqNumber != NULL_SEQ && backupRr.seqNumber != NULL_SEQ && Tf.timestamp.full < Rr.timestamp.full) {
                 /* type_2: Tp, Rp, backupTr, backupRr, Tf, Rf
@@ -288,16 +454,25 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
                 DEBUG_PRINT("Date loss caused by initializing --> update rangingTable\n");
                 // ensure data completeness
                 if(!(Tr.seqNumber == NULL_SEQ || Rr.seqNumber == NULL_SEQ || Tf.seqNumber == NULL_SEQ || Rf.seqNumber == NULL_SEQ)) {
+                    // S2_RX
+                    RangingTableEventHandler(rangingTable, RANGING_EVENT_RX);
+
                     shiftRangingTable(rangingTable);
                     fillRangingTable(rangingTable, Tr, Rr, Tf, Rf, Re, NULL_TOF);
                 }
                 else {
+                    // S2_RX_NO
+                    RangingTableEventHandler(rangingTable, RANGING_EVENT_RX_NO);
+
                     DEBUG_PRINT("Warning: Data is incomplete and the update has failed\n");
                 }
             }
 
             // data loss caused by lossing packet ---> recalculate
             else {
+                // S5_RX_NO
+                RangingTableEventHandler(rangingTable, RANGING_EVENT_RX_NO);
+
                 DEBUG_PRINT("Date loss caused by lossing packet ---> recalculate\n");
 
                 /* Tf and Rf are full  =>  use ETp, ERp, Tb, Rb, Tf, Rf
@@ -363,12 +538,18 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
 
         // normal
         if(ModifiedPTof != NULL_TOF && ModifiedPTof != MISORDER_SIGN && ModifiedPTof != INCOMPLETE_SIGN) {
+            // S5_RX
+            RangingTableEventHandler(rangingTable, RANGING_EVENT_RX);
+
             shiftRangingTable(rangingTable);
             fillRangingTable(rangingTable, Tr, Rr, Tf, Rf, Re, ModifiedPTof);
         }
 
         // problem of orderliness
         else if(ModifiedPTof == MISORDER_SIGN) {
+            // S5_RX
+            RangingTableEventHandler(rangingTable, RANGING_EVENT_RX);
+
             // use backup       -->     shift and fill
             if(backupTr.seqNumber != NULL_SEQ && backupRr.seqNumber != NULL_SEQ && Tf.timestamp.full < Rr.timestamp.full) {
                 /* type_2: Tb, Rb, Tp, Rp, backupTr, backupRr, Tf, Rf
@@ -424,6 +605,9 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
 
         // problem of completeness
         else if(ModifiedPTof == INCOMPLETE_SIGN) {
+            // S5_RX_NO
+            RangingTableEventHandler(rangingTable, RANGING_EVENT_RX_NO);
+
             // data loss caused by lossing packet ---> recalculate
             DEBUG_PRINT("Date loss caused by lossing packet ---> recalculate\n");
 
@@ -504,3 +688,4 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
         checkExpiration(rangingTableSet);
     }
 }
+

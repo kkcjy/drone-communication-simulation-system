@@ -19,7 +19,10 @@ void rangingTableInit(Ranging_Table_t *rangingTable) {
     rangingTable->continuitySign = false;
     rangingTable->expirationSign = true;
     rangingTable->initCalculateRound = 0;
-    rangingTable->state = UNUSED;
+    rangingTable->tableState = UNUSED;
+    #ifdef STATE_MACHINE_ENABLE
+        rangingTable->rangingState = RANGING_STATE_RESERVED;
+    #endif
 }
 
 // register a new rangingTable and return the index of rangingTable
@@ -30,9 +33,12 @@ table_index_t registerRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_
     }
 
     for(table_index_t index = 0; index < RANGING_TABLE_SIZE; index++) {
-        if(rangingTableSet->rangingTable[index].state == UNUSED) {
+        if(rangingTableSet->rangingTable[index].tableState == UNUSED) {
             rangingTableSet->rangingTable[index].neighborAddress = address;
-            rangingTableSet->rangingTable[index].state = USING;
+            rangingTableSet->rangingTable[index].tableState = USING;
+            #ifdef STATE_MACHINE_ENABLE
+                rangingTableSet->rangingTable[index].rangingState = RANGING_STATE_S1;
+            #endif
             rangingTableSet->priorityQueue[rangingTableSet->counter] = index;
             rangingTableSet->counter++;
 
@@ -66,7 +72,10 @@ void deregisterRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t addre
     }
 
     rangingTableSet->rangingTable[tableIdx].neighborAddress = NULL_ADDR;
-    rangingTableSet->rangingTable[tableIdx].state = UNUSED;
+    rangingTableSet->rangingTable[tableIdx].tableState = UNUSED;
+    #ifdef STATE_MACHINE_ENABLE
+        rangingTableSet->rangingTable[tableIdx].rangingState = RANGING_STATE_RESERVED;
+    #endif
 
     table_index_t queueIdx = NULL_INDEX;
     for(table_index_t i = 0; i < rangingTableSet->counter; i++) {

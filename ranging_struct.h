@@ -4,7 +4,6 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "dwTypes.h"
 #include "ranging_local_support.h"
 #include "ranging_defconfig.h"
 
@@ -29,6 +28,28 @@ typedef enum {
     USING
 } TableState;
 
+typedef enum {
+    RANGING_STATE_RESERVED,
+    RANGING_STATE_S1,
+    RANGING_STATE_S2,
+    RANGING_STATE_S3,   // RANGING_STATE_S3 is effectively a temporary state for initialization, never been invoked
+    RANGING_STATE_S4,
+    RANGING_STATE_S5,
+    RANGING_STATE_S6,   // RANGING_STATE_S6 is effectively a temporary state for distance calculation, never been invoked
+    RANGING_TABLE_STATE_COUNT
+} RANGING_TABLE_STATE;
+
+typedef enum {
+  RANGING_EVENT_TX,
+  RANGING_EVENT_RX,
+  RANGING_EVENT_RX_NO,
+  RANGING_TABLE_EVENT_COUNT
+} RANGING_TABLE_EVENT;
+
+typedef enum {
+    FIRST_CALCULATE,
+    SECOND_CALCULATE
+} CalculateState;
 
 // -------------------- Ranging Message --------------------
 typedef struct {
@@ -102,7 +123,10 @@ typedef struct {
     bool expirationSign;                // true: no recent access --> expired | recent access --> not expired
     int8_t initCalculateRound;          // used for initCalculatePTof
 
-    TableState state;                   // UNUSED / USING
+    TableState tableState;              // UNUSED / USING
+    #ifdef STATE_MACHINE_ENABLE
+    RANGING_TABLE_STATE rangingState;   // used for state machine
+    #endif
 } __attribute__((packed)) Ranging_Table_t;
 
 typedef struct {
@@ -113,12 +137,6 @@ typedef struct {
     Timestamp_Tuple_t lastRxtimestamp[RANGING_TABLE_SIZE];  
     index_t priorityQueue[RANGING_TABLE_SIZE];               // used for choosing neighbors to send messages
 } __attribute__((packed)) Ranging_Table_Set_t;
-
-
-typedef enum {
-    FIRST_CALCULATE,
-    SECOND_CALCULATE
-} CalculateState;
 
 
 void rangingTableInit(Ranging_Table_t *rangingTable);
@@ -138,6 +156,5 @@ void printRangingTable(Ranging_Table_t *rangingTable);
 void printRangingTableSet(Ranging_Table_Set_t *rangingTableSet);
 void printAssistedCalculateTuple(Timestamp_Tuple_t Tp, Timestamp_Tuple_t Rp, Timestamp_Tuple_t Tr, Timestamp_Tuple_t Rr, Timestamp_Tuple_t Tf, Timestamp_Tuple_t Rf);
 void printCalculateTuple(Timestamp_Tuple_t ETb, Timestamp_Tuple_t ERb, Timestamp_Tuple_t ETp, Timestamp_Tuple_t ERp, Timestamp_Tuple_t Tb, Timestamp_Tuple_t Rb, Timestamp_Tuple_t Tp, Timestamp_Tuple_t Rp);
-
 
 #endif
