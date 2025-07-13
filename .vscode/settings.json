@@ -16,6 +16,8 @@
         "string_view": "c",
         "socket_frame.h": "c",
         "ranging_support.h": "c",
-        "queue_task.h": "c"
+        "queue_task.h": "c",
+        "random": "c",
+        "assert.h": "c"
     }
 }

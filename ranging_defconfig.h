@@ -4,7 +4,7 @@
 // #define         CLASSIC_TOF_ENABLE
 #define         COORDINATE_SEND_ENABLE
 // #define         COMPENSATE_ENABLE
-#define         STATE_MACHINE_ENABLE
+// #define         STATE_MACHINE_ENABLE
 
 #define         COMPENSATE_RATE             0.5
 
@@ -29,12 +29,13 @@
 #define         LOWER_BOUND_DISTANCE        0
 
 #define         RANGING_PERIOD              200
+#define         RANGING_PERIOD_MIN          50   
+#define         RANGING_PERIOD_MAX          500  
+
 #define         CHECK_PERIOD                15
 #define         UWB_MAX_TIMESTAMP           1099511627776
 #define         VELOCITY                    0.4691763978616
 #define         CONVERGENCE_THRESHOLD       0.989
 #define         INIT_CALCULATION_ROUNDS     4
-
-#define         M2T(X)                      ((unsigned int)(X))
 
 #endif

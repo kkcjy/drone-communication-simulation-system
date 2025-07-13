@@ -9,12 +9,18 @@ Ranging_Table_Set_t *rangingTableSet;
 static float lastD = 0;
 #endif
 
+/*
+static UWB_Message_Listener_t listener;
+static TaskHandle_t uwbRangingTxTaskHandle = 0;
+static TaskHandle_t uwbRangingRxTaskHandle = 0;
+*/
+
 
 // -------------------- Ranging Table Set Operation --------------------
 void rangingTableSetInit() {
     MY_UWB_ADDRESS = uwbGetAddress();
 
-    rangingTableSet = (Ranging_Table_Set_t *)malloc(sizeof(Ranging_Table_Set_t));
+    rangingTableSet = (Ranging_Table_Set_t*)malloc(sizeof(Ranging_Table_Set_t));
     rangingTableSet->counter = 0;
     rangingTableSet->localSeqNumber = NULL_SEQ;
     rangingTableSet->sendList.topIndex = NULL_INDEX;
@@ -29,6 +35,7 @@ void rangingTableSetInit() {
         rangingTableSet->lastRxtimestamp[i] = nullTimestampTuple;
         rangingTableSet->priorityQueue[i] = NULL_INDEX;
     }
+    rangingTableSet->mutex = xSemaphoreCreateMutex();
 }
 
 // search for index of send list whose Tx seqNumber is same as seqNumber
@@ -82,6 +89,7 @@ void updatePriority(Ranging_Table_Set_t *rangingTableSet, uint16_t address) {
 
 
 // -------------------- State Machine Operation --------------------
+#ifdef STATE_MACHINE_ENABLE
 static void RESERVED_STUB(Ranging_Table_t *rangingTable) {
     assert(0 && "[RESERVED_STUB]: Should not be called\n");
 }
@@ -228,13 +236,15 @@ static EventHandlerTable EVENT_HANDLER[RANGING_TABLE_STATE_COUNT][RANGING_TABLE_
     {S6_TX, S6_RX, S6_RX_NO}
 };
 
-void RangingTableEventHandler(Ranging_Table_t *rangingTable, RANGING_TABLE_EVENT event)
-{
+void RangingTableEventHandler(Ranging_Table_t *rangingTable, RANGING_TABLE_EVENT event) {
     assert((rangingTable->rangingState < RANGING_TABLE_STATE_COUNT) && "Warning: Should not be called\n");
     assert((event < RANGING_TABLE_EVENT_COUNT) && "Warning: Should not be called\n");
     EVENT_HANDLER[rangingTable->rangingState][event](rangingTable);
 }
+#endif
 
+
+// -------------------- Generate and Process --------------------
 Time_t generateMessage(Ranging_Message_t *rangingMessage) {
     Time_t taskDelay = M2T(RANGING_PERIOD);
 
@@ -253,9 +263,11 @@ Time_t generateMessage(Ranging_Message_t *rangingMessage) {
 
             rangingMessage->header.filter |= 1 << (rangingTableSet->rangingTable[index].neighborAddress % 16);
             
-            // Si_TX
-            RangingTableEventHandler(&rangingTableSet->rangingTable[index], RANGING_EVENT_TX);
-            
+            #ifdef STATE_MACHINE_ENABLE
+                // Si_TX
+                RangingTableEventHandler(&rangingTableSet->rangingTable[index], RANGING_EVENT_TX);
+            #endif
+
             bodyUnitCount++;
         }
     }
@@ -378,12 +390,16 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
         +------+------+------+------+------+------+------+
     */
     if(rangingTable->initCalculateRound < INIT_CALCULATION_ROUNDS) {
+        printAssistedCalculateTuple(rangingTable->Tp, rangingTable->Rp, Tr, Rr, Tf, Rf);
+
         float initPTof = assistedCalculatePTof(rangingTable, Tr, Rr, Tf, Rf);
 
         // normal
         if(initPTof != NULL_TOF && initPTof != MISORDER_SIGN && initPTof != INCOMPLETE_SIGN) {
-            // S5_RX
-            RangingTableEventHandler(rangingTable, RANGING_EVENT_RX);
+            #ifdef STATE_MACHINE_ENABLE
+                // S5_RX
+                RangingTableEventHandler(rangingTable, RANGING_EVENT_RX);
+            #endif
 
             rangingTable->initCalculateRound++;
             shiftRangingTable(rangingTable);
@@ -396,11 +412,13 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
 
         // problem of orderliness
         else if(initPTof == MISORDER_SIGN) {
-            // S5_RX
-            RangingTableEventHandler(rangingTable, RANGING_EVENT_RX);
+            #ifdef STATE_MACHINE_ENABLE
+                // S5_RX
+                RangingTableEventHandler(rangingTable, RANGING_EVENT_RX);
+            #endif
 
             // use backup       -->     shift and fill
-            if(backupTr.seqNumber != NULL_SEQ && backupRr.seqNumber != NULL_SEQ && Tf.timestamp.full < Rr.timestamp.full) {
+            if(backupTr.seqNumber != NULL_SEQ && backupRr.seqNumber != NULL_SEQ && COMPARE_TIME(Tf, Rr)) {
                 /* type_2: Tp, Rp, backupTr, backupRr, Tf, Rf
                     Tb           Rp     Tr           Rf
                         
@@ -420,7 +438,7 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
                     
                        Rb     Tp           Rr     Tf
                 */
-                if(Tr.timestamp.full < rangingTable->Rp.timestamp.full) {
+                if(COMPARE_TIME(Tr, rangingTable->Rp)) {
                     Ranging_Table_t tmpRangingTable;
                     tmpRangingTable.Tp = rangingTable->ETp;
                     tmpRangingTable.Rp = rangingTable->ERp;
@@ -434,7 +452,7 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
                         
                        Rb     Tp           Tf     Rr
                 */
-                else if(Tf.timestamp.full < Rr.timestamp.full) {
+                else if(COMPARE_TIME(Tf, Rr)) {
                     Ranging_Table_t tmpRangingTable;
                     tmpRangingTable.Tp = rangingTable->Tb;
                     tmpRangingTable.Rp = rangingTable->Rb;
@@ -454,15 +472,19 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
                 DEBUG_PRINT("Date loss caused by initializing --> update rangingTable\n");
                 // ensure data completeness
                 if(!(Tr.seqNumber == NULL_SEQ || Rr.seqNumber == NULL_SEQ || Tf.seqNumber == NULL_SEQ || Rf.seqNumber == NULL_SEQ)) {
-                    // S2_RX
-                    RangingTableEventHandler(rangingTable, RANGING_EVENT_RX);
+                    #ifdef STATE_MACHINE_ENABLE
+                        // S2_RX
+                        RangingTableEventHandler(rangingTable, RANGING_EVENT_RX);
+                    #endif
 
                     shiftRangingTable(rangingTable);
                     fillRangingTable(rangingTable, Tr, Rr, Tf, Rf, Re, NULL_TOF);
                 }
                 else {
-                    // S2_RX_NO
-                    RangingTableEventHandler(rangingTable, RANGING_EVENT_RX_NO);
+                    #ifdef STATE_MACHINE_ENABLE
+                        // S2_RX_NO
+                        RangingTableEventHandler(rangingTable, RANGING_EVENT_RX_NO);
+                    #endif
 
                     DEBUG_PRINT("Warning: Data is incomplete and the update has failed\n");
                 }
@@ -470,8 +492,10 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
 
             // data loss caused by lossing packet ---> recalculate
             else {
-                // S5_RX_NO
-                RangingTableEventHandler(rangingTable, RANGING_EVENT_RX_NO);
+                #ifdef STATE_MACHINE_ENABLE
+                    // S5_RX_NO
+                    RangingTableEventHandler(rangingTable, RANGING_EVENT_RX_NO);
+                #endif
 
                 DEBUG_PRINT("Date loss caused by lossing packet ---> recalculate\n");
 
@@ -534,12 +558,16 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
     */
     // modified protocol
     else {
+        printCalculateTuple(rangingTable->Tb, rangingTable->Rb, rangingTable->Tp, rangingTable->Rp, Tr, Rr, Tf, Rf);
+
         float ModifiedPTof = calculatePTof(rangingTable, Tr, Rr, Tf, Rf, FIRST_CALCULATE);
 
         // normal
         if(ModifiedPTof != NULL_TOF && ModifiedPTof != MISORDER_SIGN && ModifiedPTof != INCOMPLETE_SIGN) {
-            // S5_RX
-            RangingTableEventHandler(rangingTable, RANGING_EVENT_RX);
+            #ifdef STATE_MACHINE_ENABLE
+                // S5_RX
+                RangingTableEventHandler(rangingTable, RANGING_EVENT_RX);
+            #endif
 
             shiftRangingTable(rangingTable);
             fillRangingTable(rangingTable, Tr, Rr, Tf, Rf, Re, ModifiedPTof);
@@ -547,11 +575,13 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
 
         // problem of orderliness
         else if(ModifiedPTof == MISORDER_SIGN) {
-            // S5_RX
-            RangingTableEventHandler(rangingTable, RANGING_EVENT_RX);
+            #ifdef STATE_MACHINE_ENABLE
+                // S5_RX
+                RangingTableEventHandler(rangingTable, RANGING_EVENT_RX);
+            #endif
 
             // use backup       -->     shift and fill
-            if(backupTr.seqNumber != NULL_SEQ && backupRr.seqNumber != NULL_SEQ && Tf.timestamp.full < Rr.timestamp.full) {
+            if(backupTr.seqNumber != NULL_SEQ && backupRr.seqNumber != NULL_SEQ && COMPARE_TIME(Tf, Rr)) {
                 /* type_2: Tb, Rb, Tp, Rp, backupTr, backupRr, Tf, Rf
                     Tb           Rp     Tr           Rf
                         
@@ -571,7 +601,7 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
                     
                        Rb     Tp           Rr     Tf
                 */
-                if(Tr.timestamp.full < rangingTable->Rp.timestamp.full) {
+                if(COMPARE_TIME(Tr, rangingTable->Rp)) {
                     Ranging_Table_t tmpRangingTable;
                     tmpRangingTable.Tb = rangingTable->ETp;
                     tmpRangingTable.Rb = rangingTable->ERp;
@@ -588,7 +618,7 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
                         
                        Rb     Tp           Tf     Rr
                 */
-               else if(Tf.timestamp.full < Rr.timestamp.full) {
+               else if(COMPARE_TIME(Tf, Rr)) {
                     Ranging_Table_t tmpRangingTable;
                     tmpRangingTable.Tb = rangingTable->Tb;
                     tmpRangingTable.Rb = rangingTable->Rb;
@@ -605,8 +635,10 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
 
         // problem of completeness
         else if(ModifiedPTof == INCOMPLETE_SIGN) {
-            // S5_RX_NO
-            RangingTableEventHandler(rangingTable, RANGING_EVENT_RX_NO);
+            #ifdef STATE_MACHINE_ENABLE
+                // S5_RX_NO
+                RangingTableEventHandler(rangingTable, RANGING_EVENT_RX_NO);
+            #endif
 
             // data loss caused by lossing packet ---> recalculate
             DEBUG_PRINT("Date loss caused by lossing packet ---> recalculate\n");
@@ -680,7 +712,8 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
             DEBUG_PRINT("[CalculatePTof]: CalculatePTof failed\n");
         }
     }
-    // printRangingTableSet(rangingTableSet);
+
+    printRangingTableSet(rangingTableSet);
 
     rangingTableSet->rangingTable[neighborIndex].expirationSign = false;
 
@@ -689,3 +722,98 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
     }
 }
 
+
+// -------------------- Call back --------------------
+/*
+static void uwbRangingTxTask(void *parameters) {
+    systemWaitStart();
+
+    UWB_Packet_t txPacketCache;
+    txPacketCache.header.srcAddress = uwbGetAddress();
+    txPacketCache.header.destAddress = UWB_DEST_ANY;
+    txPacketCache.header.type = UWB_RANGING_MESSAGE;
+    txPacketCache.header.length = 0;
+    Ranging_Message_t *rangingMessage = (Ranging_Message_t*)&txPacketCache.payload;
+
+    while (true) {
+        xSemaphoreTake(rangingTableSet->mutex, portMAX_DELAY);
+
+        DEBUG_PRINT("[uwbRangingTxTask] Acquired mutex, generating ranging message\n");
+        Time_t taskDelay = RANGING_PERIOD;
+
+        generateMessage(rangingMessage);
+        
+        txPacketCache.header.seqNumber++;
+        txPacketCache.header.length = sizeof(UWB_Packet_Header_t) + rangingMessage->header.msgLength;
+        
+        uwbSendPacketBlock(&txPacketCache);
+
+        xSemaphoreGive(rangingTableSet->mutex);
+
+        vTaskDelay(taskDelay);
+    }
+}
+
+static void uwbRangingRxTask(void *parameters) {
+    systemWaitStart();
+
+    Ranging_Message_With_Additional_Info_t rxPacketCache;
+
+    while (true) {
+        if (xQueueReceive(rxQueue, &rxPacketCache, portMAX_DELAY)) {
+            xSemaphoreTake(rangingTableSet->mutex, portMAX_DELAY);
+
+            processRangingMessage(&rxPacketCache);
+
+            xSemaphoreGive(rangingTableSet->mutex);
+        }
+        vTaskDelay(M2T(1));
+    }
+}
+
+void rangingTxCallback(void *parameters) {
+    UWB_Packet_t *packet = (UWB_Packet_t*)parameters;
+    Ranging_Message_t *rangingMessage = (Ranging_Message_t*)packet->payload;
+
+    dwTime_t txTime;
+    dwt_readtxtimestamp((uint8_t*)&txTime.raw);
+
+    Timestamp_Tuple_t timestamp = {.timestamp = txTime, .seqNumber = rangingMessage->header.msgSequence};
+    updateSendList(&rangingTableSet->sendList, timestamp);
+}
+
+void rangingRxCallback(void *parameters) {
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+    UWB_Packet_t *packet = (UWB_Packet_t*)parameters;
+
+    dwTime_t rxTime;
+    dwt_readrxtimestamp((uint8_t*)&rxTime.raw);
+
+    Ranging_Message_With_Additional_Info_t rxMessageWithTimestamp;
+    rxMessageWithTimestamp.timestamp = rxTime;
+    Ranging_Message_t *rangingMessage = (Ranging_Message_t*)packet->payload;
+    rxMessageWithTimestamp.rangingMessage = *rangingMessage;
+
+    xQueueSendFromISR(rxQueue, &rxMessageWithTimestamp, &xHigherPriorityTaskWoken);
+}
+
+void rangingInit() {
+    rangingTableSetInit(&rangingTableSet);
+
+    srand(MY_UWB_ADDRESS);
+    
+    rxQueue = xQueueCreate(RANGING_RX_QUEUE_SIZE, RANGING_RX_QUEUE_ITEM_SIZE);
+    
+    listener.type = UWB_RANGING_MESSAGE;
+    listener.rxQueue = NULL;
+    listener.rxCb = rangingRxCallback;
+    listener.txCb = rangingTxCallback;
+    uwbRegisterListener(&listener);
+
+    xTaskCreate(uwbRangingTxTask, ADHOC_UWB_RANGING_TX_TASK_NAME, UWB_TASK_STACK_SIZE, NULL,
+                ADHOC_UWB_TASK_PRI, &uwbRangingTxTaskHandle);
+    xTaskCreate(uwbRangingRxTask, ADHOC_UWB_RANGING_RX_TASK_NAME, UWB_TASK_STACK_SIZE, NULL,
+                ADHOC_UWB_TASK_PRI, &uwbRangingRxTaskHandle);
+}
+*/

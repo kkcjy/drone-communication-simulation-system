@@ -2,6 +2,11 @@
 #include "ranging_struct.h"
 
 
+// determine whether the actual time_a is less than time_b
+bool COMPARE_TIME(Timestamp_Tuple_t time_a, Timestamp_Tuple_t time_b) {
+    return ((time_b.timestamp.full - time_a.timestamp.full) & UWB_MAX_TIMESTAMP) < UWB_MAX_TIMESTAMP/2;
+}
+
 void rangingTableInit(Ranging_Table_t *rangingTable) {
     rangingTable->neighborAddress = NULL_ADDR;
     rangingTable->ETb = nullTimestampTuple;
@@ -227,11 +232,9 @@ float assistedCalculatePTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr,
         return INCOMPLETE_SIGN;
     }
 
-    // printAssistedCalculateTuple(Tp, Rp, Tr, Rr, Tf, Rf);
-
     // check orderliness
-    if(!(Tp.timestamp.full < Rr.timestamp.full && Rr.timestamp.full < Tf.timestamp.full
-        && Rp.timestamp.full < Tr.timestamp.full && Tr.timestamp.full < Rf.timestamp.full)) {
+    if(!(COMPARE_TIME(Tp, Rr) && COMPARE_TIME(Rr, Tf)
+        && COMPARE_TIME(Rp, Tr) && COMPARE_TIME(Tr, Rf))) {
         DEBUG_PRINT("Warning: Data calculation is not in order\n");
         return MISORDER_SIGN;
     }
@@ -273,8 +276,6 @@ float calculatePTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr, Timesta
         }
     }
 
-    // printCalculateTuple(rangingTable->Tb, rangingTable->Rb, rangingTable->Tp, rangingTable->Rp, Tr, Rr, Tf, Rf);
-
 /*
 first step:
     try
@@ -292,8 +293,8 @@ first step:
     float Tof23 = NULL_TOF;
 
     // check orderliness
-    if(!(rangingTable->Rb.timestamp.full < rangingTable->Tp.timestamp.full && rangingTable->Tp.timestamp.full < Rr.timestamp.full
-        && rangingTable->Tb.timestamp.full < rangingTable->Rp.timestamp.full && rangingTable->Rp.timestamp.full < Tr.timestamp.full)) {
+    if(!(COMPARE_TIME(rangingTable->Rb, rangingTable->Tp) && COMPARE_TIME(rangingTable->Tp, Rr)
+        && COMPARE_TIME(rangingTable->Tb, rangingTable->Rp) && COMPARE_TIME(rangingTable->Rp, Tr))) {
         DEBUG_PRINT("Warning: Data calculation is not in order\n");
     }
 
@@ -352,7 +353,7 @@ first step:
     // beyond the convergence condition
     else {
         if(state == FIRST_CALCULATE) {
-            DEBUG_PRINT("Warning: Ra1/Da1 and Rb1/Db1 are both greater than CONVERGENCE_THRESHOLD(%f), Ra_Da_1 = %f, Rb_Db_1 = %f, retry to calculate\n", CONVERGENCE_THRESHOLD, Ra_Da_1, Rb_Db_1);
+            DEBUG_PRINT("Warning: Ra1/Da1 and Rb1/Db1 are both greater than CONVERGENCE_THRESHOLD = %f, Ra1 = %d, Da1 = %d, Rb1 = %d, Db1 = %d, Ra_Da_1 = %f, Rb_Db_1 = %f, retry to calculate\n", CONVERGENCE_THRESHOLD, Ra1, Da1, Rb1, Db1, Ra_Da_1, Rb_Db_1);
             #if defined(CLASSIC_TOF_ENABLE)
                 // fallback to classic PTof calculation
                 Tof23 = (diffA1 * Rb1 + diffA1 * Db1 + diffB1 * Ra1 + diffB1 * Da1) / (float)(Ra1 + Db1 + Rb1 + Da1);
@@ -394,8 +395,8 @@ second step:
     float Tof34 = NULL_TOF;
 
      // check orderliness
-    if(!(rangingTable->Tp.timestamp.full < Rr.timestamp.full && Rr.timestamp.full < Tf.timestamp.full
-        && rangingTable->Rp.timestamp.full < Tr.timestamp.full && Tr.timestamp.full < Rf.timestamp.full)) {
+    if(!(COMPARE_TIME(rangingTable->Tp, Rr) && COMPARE_TIME(Rr, Tf)
+        && COMPARE_TIME(rangingTable->Rp, Tr) && COMPARE_TIME(Tr, Rf))) {
         DEBUG_PRINT("Warning: Data calculation is not in order\n");
         return MISORDER_SIGN;
     }
@@ -447,7 +448,7 @@ second step:
     } 
     else {
         if(state == FIRST_CALCULATE) {
-            DEBUG_PRINT("Warning: Ra2/Da2 and Rb2/Db2 are both greater than CONVERGENCE_THRESHOLD(%f), Ra_Da_2 = %f, Rb_Db_2 = %f, retry to calculate\n", CONVERGENCE_THRESHOLD, Ra_Da_1, Rb_Db_1);
+            DEBUG_PRINT("Warning: Ra2/Da2 and Rb2/Db2 are both greater than CONVERGENCE_THRESHOLD = %f, Ra2 = %d, Da2 = %d, Rb2 = %d, Db2 = %d, Ra_Da_2 = %f, Rb_Db_2 = %f, retry to calculate\n", CONVERGENCE_THRESHOLD, Ra2, Da2, Rb2, Db2, Ra_Da_2, Rb_Db_2);
             #if defined(CLASSIC_TOF_ENABLE)
                 // fallback to classic PTof calculation
                 Tof34 = (diffA2 * Rb2 + diffA2 * Db2 + diffB2 * Ra2 + diffB2 * Da2) / (float)(Ra2 + Db2 + Rb2 + Da2);
@@ -522,7 +523,7 @@ void printRangingTable(Ranging_Table_t *rangingTable) {
     DEBUG_PRINT("(Rp) seqNumber: %u, timestamp: %llu\n", rangingTable->Rp.seqNumber, rangingTable->Rp.timestamp.full);
     DEBUG_PRINT("(Rr) seqNumber: %u, timestamp: %llu\n", rangingTable->Rr.seqNumber, rangingTable->Rr.timestamp.full);
 
-    DEBUG_PRINT("PTof = %f, EPTof = %f, sign = %s\n", rangingTable->PTof, rangingTable->EPTof, rangingTable->continuitySign == true ? "true" : "false");
+    DEBUG_PRINT("PTof = %f, EPTof = %f, continuitySign = %s\n", rangingTable->PTof, rangingTable->EPTof, rangingTable->continuitySign == true ? "true" : "false");
 }
 
 void printRangingTableSet(Ranging_Table_Set_t *rangingTableSet) {
@@ -552,15 +553,15 @@ void printAssistedCalculateTuple(Timestamp_Tuple_t Tp, Timestamp_Tuple_t Rp, Tim
         Tp.seqNumber, Tp.timestamp.full, Rr.timestamp.full - Tp.timestamp.full, Rr.seqNumber, Rr.timestamp.full, Tf.timestamp.full - Rr.timestamp.full, Tf.seqNumber, Tf.timestamp.full);
 }
 
-void printCalculateTuple(Timestamp_Tuple_t ETb, Timestamp_Tuple_t ERb, Timestamp_Tuple_t ETp, Timestamp_Tuple_t ERp, Timestamp_Tuple_t Tb, Timestamp_Tuple_t Rb, Timestamp_Tuple_t Tp, Timestamp_Tuple_t Rp) {
-    DEBUG_PRINT("\nT1[seq=%u, ts=%llu] <--%llu--> ERp[seq=%u, ts=%llu] <--%llu--> Tb[seq=%u, ts=%llu] <--%llu--> Rp[seq=%u, ts=%llu]\n",
-               ETb.seqNumber,ETb.timestamp.full,
-                ERp.timestamp.full -ETb.timestamp.full, ERp.seqNumber, ERp.timestamp.full,
-                Tb.timestamp.full - ERp.timestamp.full, Tb.seqNumber, Tb.timestamp.full,
-                Rp.timestamp.full - Tb.timestamp.full, Rp.seqNumber, Rp.timestamp.full);
-    DEBUG_PRINT("\nR1[seq=%u, ts=%llu] <--%llu-->ETp[seq=%u, ts=%llu] <--%llu--> Rb[seq=%u, ts=%llu] <--%llu--> Tp[seq=%u, ts=%llu]\n",
-               ERb.seqNumber,ERb.timestamp.full,
-               ETp.timestamp.full -ERb.timestamp.full,ETp.seqNumber,ETp.timestamp.full,
-                Rb.timestamp.full -ETp.timestamp.full, Rb.seqNumber, Rb.timestamp.full,
-                Tp.timestamp.full - Rb.timestamp.full, Tp.seqNumber, Tp.timestamp.full);
+void printCalculateTuple(Timestamp_Tuple_t Tb, Timestamp_Tuple_t Rb, Timestamp_Tuple_t Tp, Timestamp_Tuple_t Rp, Timestamp_Tuple_t Tr, Timestamp_Tuple_t Rr, Timestamp_Tuple_t Tf, Timestamp_Tuple_t Rf) {
+    DEBUG_PRINT("\nTb[seq=%u, ts=%llu] <--%llu--> Rp[seq=%u, ts=%llu] <--%llu--> Tr[seq=%u, ts=%llu] <--%llu--> Rf[seq=%u, ts=%llu]\n",
+                Tb.seqNumber,Tb.timestamp.full,
+                Rp.timestamp.full -Tb.timestamp.full, Rp.seqNumber, Rp.timestamp.full,
+                Tr.timestamp.full - Rp.timestamp.full, Tr.seqNumber, Tr.timestamp.full,
+                Rf.timestamp.full - Tr.timestamp.full, Rf.seqNumber, Rf.timestamp.full);
+    DEBUG_PRINT("\nRb[seq=%u, ts=%llu] <--%llu--> Tp[seq=%u, ts=%llu] <--%llu--> Rr[seq=%u, ts=%llu] <--%llu--> Tf[seq=%u, ts=%llu]\n",
+                Rb.seqNumber,Rb.timestamp.full,
+                Tp.timestamp.full -Rb.timestamp.full,Tp.seqNumber,Tp.timestamp.full,
+                Rr.timestamp.full -Tp.timestamp.full, Rr.seqNumber, Rr.timestamp.full,
+                Tf.timestamp.full - Rr.timestamp.full, Tf.seqNumber, Tf.timestamp.full);
 }

@@ -30,7 +30,7 @@ void send_to_center(int center_socket, const char* node_id, const Ranging_Messag
 
 // for Rx
 void *receive_from_center(void *arg) {
-    int center_socket = *(int *)arg;
+    int center_socket = *(int*)arg;
     NodeMessage msg;
 
     while (1) {
@@ -140,7 +140,7 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    if (connect(center_socket, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+    if (connect(center_socket, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
         perror("Connection Failed");
         return -1;
     }

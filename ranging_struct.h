@@ -135,10 +135,12 @@ typedef struct {
     SendList_t sendList;                                    // timestamps of messages sent to neighbors
     Ranging_Table_t rangingTable[RANGING_TABLE_SIZE];
     Timestamp_Tuple_t lastRxtimestamp[RANGING_TABLE_SIZE];  
-    index_t priorityQueue[RANGING_TABLE_SIZE];               // used for choosing neighbors to send messages
+    index_t priorityQueue[RANGING_TABLE_SIZE];              // used for choosing neighbors to send messages
+    SemaphoreHandle_t mutex;
 } __attribute__((packed)) Ranging_Table_Set_t;
 
 
+bool COMPARE_TIME(Timestamp_Tuple_t time_a, Timestamp_Tuple_t time_b);
 void rangingTableInit(Ranging_Table_t *rangingTable);
 table_index_t registerRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t address);
 void deregisterRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t address);

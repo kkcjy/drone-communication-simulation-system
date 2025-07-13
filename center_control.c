@@ -17,7 +17,7 @@ void broadcast_to_nodes(NodeMessage *msg) {
 }
 
 void *handle_node_connection(void *arg) {
-    int node_socket = *(int *)arg;
+    int node_socket = *(int*)arg;
     free(arg);
     
     char node_id[ID_SIZE];
@@ -96,7 +96,7 @@ int main() {
         .sin_port = htons(CENTER_PORT)
     };
 
-    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+    if (bind(server_fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
         perror("bind failed");
         exit(EXIT_FAILURE);
     }
@@ -112,7 +112,7 @@ int main() {
     while (1) {
         int *new_socket = malloc(sizeof(int));
         socklen_t addrlen = sizeof(address);
-        *new_socket = accept(server_fd, (struct sockaddr *)&address, &addrlen);
+        *new_socket = accept(server_fd, (struct sockaddr*)&address, &addrlen);
         if (*new_socket < 0) {
             perror("accept");
             free(new_socket);
