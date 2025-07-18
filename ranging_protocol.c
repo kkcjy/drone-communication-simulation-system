@@ -21,7 +21,7 @@ void rangingTableSetInit() {
     MY_UWB_ADDRESS = uwbGetAddress();
 
     rangingTableSet = (Ranging_Table_Set_t*)malloc(sizeof(Ranging_Table_Set_t));
-    rangingTableSet->counter = 0;
+    rangingTableSet->size = 0;
     rangingTableSet->localSeqNumber = NULL_SEQ;
     rangingTableSet->sendList.topIndex = NULL_INDEX;
     for (int i = 0; i < SEND_LIST_SIZE; i++) {
@@ -69,22 +69,34 @@ void updateSendList(SendList_t *sendList, Timestamp_Tuple_t timestampTuple) {
 }
 #endif
 
-// update the priority queue, push address to the tail
-void updatePriority(Ranging_Table_Set_t *rangingTableSet, uint16_t address) {
-    index_t *queue = rangingTableSet->priorityQueue;
+// update the circular priority queue
+void updatePriority(Ranging_Table_Set_t *rangingTableSet, int8_t shiftCount) {
+    if(rangingTableSet->size <= 1 || shiftCount <= 0) {
+        return;
+    }
 
-    for(int i = 0; i < rangingTableSet->counter; i++) {
-        if(rangingTableSet->rangingTable[i].neighborAddress == address) {
-            // move the index of table to the tail of priority queue
-            for(int j = i; j < rangingTableSet->counter - 1; j++) {
-                uint8_t tmp = queue[j];
-                queue[j] = queue[j + 1];
-                queue[j + 1] = tmp;
-            }
-            queue[rangingTableSet->counter - 1] = i;
-            return;
+    index_t *tmpQueue = malloc(sizeof(index_t) * shiftCount);
+
+    if(!tmpQueue) {
+        assert(0 && "Warning: Should not be called\n");
+    }
+
+    for(int i = 0; i < shiftCount; i++) {
+        tmpQueue[i] = rangingTableSet->priorityQueue[i];
+    }
+
+    int8_t idx = 0;
+
+    for(; idx < rangingTableSet->size; idx++) {
+        if(idx + shiftCount < rangingTableSet->size) {
+            rangingTableSet->priorityQueue[idx] = rangingTableSet->priorityQueue[idx + shiftCount];
+        }
+        else {
+            rangingTableSet->priorityQueue[idx] = tmpQueue[idx + shiftCount - rangingTableSet->size];
         }
     }
+
+    free(tmpQueue);
 }
 
 
@@ -248,12 +260,12 @@ void RangingTableEventHandler(Ranging_Table_t *rangingTable, RANGING_TABLE_EVENT
 Time_t generateMessage(Ranging_Message_t *rangingMessage) {
     Time_t taskDelay = M2T(RANGING_PERIOD);
 
-    int8_t bodyUnitCount = 0;     // counter for valid bodyunits
+    int8_t bodyUnitCount = 0;     
     rangingTableSet->localSeqNumber++;
     rangingMessage->header.filter = 0;
 
     /* generate bodyUnit */
-    while(bodyUnitCount < MESSAGE_BODY_UNIT_SIZE && bodyUnitCount < rangingTableSet->counter) {
+    while(bodyUnitCount < MESSAGE_BODY_UNIT_SIZE && bodyUnitCount < rangingTableSet->size) {
         Message_Body_Unit_t *bodyUnit = &rangingMessage->bodyUnits[bodyUnitCount];
         if(bodyUnit->Rxtimestamp.timestamp.full != nullTimestampTuple.timestamp.full) {
             index_t index = rangingTableSet->priorityQueue[bodyUnitCount];
@@ -264,13 +276,15 @@ Time_t generateMessage(Ranging_Message_t *rangingMessage) {
             rangingMessage->header.filter |= 1 << (rangingTableSet->rangingTable[index].neighborAddress % 16);
             
             #ifdef STATE_MACHINE_ENABLE
-                // Si_TX
                 RangingTableEventHandler(&rangingTableSet->rangingTable[index], RANGING_EVENT_TX);
             #endif
 
             bodyUnitCount++;
         }
     }
+
+    // update priority queue
+    updatePriority(rangingTableSet, bodyUnitCount);
 
     /* generate header */
     rangingMessage->header.srcAddress = MY_UWB_ADDRESS;
@@ -302,6 +316,13 @@ Time_t generateMessage(Ranging_Message_t *rangingMessage) {
         updateSendList(&rangingTableSet->sendList, curTimestamp);
     #endif
 
+    // clear expired rangingTable
+    if(rangingTableSet->localSeqNumber % CHECK_PERIOD == 0) {
+        checkExpiration(rangingTableSet);
+    }
+
+    printRangingMessage(rangingMessage);
+
     return taskDelay;
 }
 
@@ -320,10 +341,6 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
             DEBUG_PRINT("Warning: Failed to register new neighbor.\n");
             return;
         }
-    }
-    // update priority queue
-    else {
-        updatePriority(rangingTableSet, neighborAddress);
     }
 
     Ranging_Table_t *rangingTable = &rangingTableSet->rangingTable[neighborIndex];
@@ -364,7 +381,7 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
     // backupTr and backupRr are used for dealing with order problem
     Timestamp_Tuple_t Rr = rangingTableSet->lastRxtimestamp[neighborIndex];
     /*  Rr              - calculate normalfully -> update
-        lastRxtimestamp - receive message        -> update
+        lastRxtimestamp - receive message       -> update
     */
     Timestamp_Tuple_t backupRr = (rangingTable->Rr.seqNumber == rangingTableSet->lastRxtimestamp[neighborIndex].seqNumber) ? nullTimestampTuple : rangingTable->Rr;
 
@@ -397,7 +414,6 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
         // normal
         if(initPTof != NULL_TOF && initPTof != MISORDER_SIGN && initPTof != INCOMPLETE_SIGN) {
             #ifdef STATE_MACHINE_ENABLE
-                // S5_RX
                 RangingTableEventHandler(rangingTable, RANGING_EVENT_RX);
             #endif
 
@@ -413,7 +429,6 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
         // problem of orderliness
         else if(initPTof == MISORDER_SIGN) {
             #ifdef STATE_MACHINE_ENABLE
-                // S5_RX
                 RangingTableEventHandler(rangingTable, RANGING_EVENT_RX);
             #endif
 
@@ -473,7 +488,6 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
                 // ensure data completeness
                 if(!(Tr.seqNumber == NULL_SEQ || Rr.seqNumber == NULL_SEQ || Tf.seqNumber == NULL_SEQ || Rf.seqNumber == NULL_SEQ)) {
                     #ifdef STATE_MACHINE_ENABLE
-                        // S2_RX
                         RangingTableEventHandler(rangingTable, RANGING_EVENT_RX);
                     #endif
 
@@ -482,7 +496,6 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
                 }
                 else {
                     #ifdef STATE_MACHINE_ENABLE
-                        // S2_RX_NO
                         RangingTableEventHandler(rangingTable, RANGING_EVENT_RX_NO);
                     #endif
 
@@ -493,7 +506,6 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
             // data loss caused by lossing packet ---> recalculate
             else {
                 #ifdef STATE_MACHINE_ENABLE
-                    // S5_RX_NO
                     RangingTableEventHandler(rangingTable, RANGING_EVENT_RX_NO);
                 #endif
 
@@ -565,7 +577,6 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
         // normal
         if(ModifiedPTof != NULL_TOF && ModifiedPTof != MISORDER_SIGN && ModifiedPTof != INCOMPLETE_SIGN) {
             #ifdef STATE_MACHINE_ENABLE
-                // S5_RX
                 RangingTableEventHandler(rangingTable, RANGING_EVENT_RX);
             #endif
 
@@ -576,7 +587,6 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
         // problem of orderliness
         else if(ModifiedPTof == MISORDER_SIGN) {
             #ifdef STATE_MACHINE_ENABLE
-                // S5_RX
                 RangingTableEventHandler(rangingTable, RANGING_EVENT_RX);
             #endif
 
@@ -636,7 +646,6 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
         // problem of completeness
         else if(ModifiedPTof == INCOMPLETE_SIGN) {
             #ifdef STATE_MACHINE_ENABLE
-                // S5_RX_NO
                 RangingTableEventHandler(rangingTable, RANGING_EVENT_RX_NO);
             #endif
 
@@ -713,13 +722,9 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
         }
     }
 
-    printRangingTableSet(rangingTableSet);
-
     rangingTableSet->rangingTable[neighborIndex].expirationSign = false;
 
-    if(rangingTableSet->localSeqNumber % CHECK_PERIOD == 0) {
-        checkExpiration(rangingTableSet);
-    }
+    // printRangingTableSet(rangingTableSet);
 }
 
 

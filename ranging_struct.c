@@ -32,7 +32,7 @@ void rangingTableInit(Ranging_Table_t *rangingTable) {
 
 // register a new rangingTable and return the index of rangingTable
 table_index_t registerRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t address) {
-    if (rangingTableSet->counter >= RANGING_TABLE_SIZE) {
+    if (rangingTableSet->size >= RANGING_TABLE_SIZE) {
         DEBUG_PRINT("Ranging table Set is full, cannot register new table\n");
         return NULL_INDEX;
     }
@@ -44,8 +44,9 @@ table_index_t registerRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_
             #ifdef STATE_MACHINE_ENABLE
                 rangingTableSet->rangingTable[index].rangingState = RANGING_STATE_S1;
             #endif
-            rangingTableSet->priorityQueue[rangingTableSet->counter] = index;
-            rangingTableSet->counter++;
+            // newly registered neighbor is in the initialization phase and cannot trigger calculations in the short term, so their priority is low
+            rangingTableSet->priorityQueue[rangingTableSet->size] = index;
+            rangingTableSet->size++;
 
             DEBUG_PRINT("Registered new ranging table entry: Address = %u\n", address);
             return index;
@@ -58,7 +59,7 @@ table_index_t registerRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_
 
 // deregister a rangingTable by address and update the priority queue
 void deregisterRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t address) {
-    if(rangingTableSet->counter == 0) {
+    if(rangingTableSet->size == 0) {
         DEBUG_PRINT("Ranging table Set is empty, cannot deregister table\n");
         return;
     }
@@ -83,7 +84,7 @@ void deregisterRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t addre
     #endif
 
     table_index_t queueIdx = NULL_INDEX;
-    for(table_index_t i = 0; i < rangingTableSet->counter; i++) {
+    for(table_index_t i = 0; i < rangingTableSet->size; i++) {
         if(rangingTableSet->priorityQueue[i] == tableIdx) {
             queueIdx = i;
             break;
@@ -95,18 +96,18 @@ void deregisterRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t addre
         return;
     }
 
-    for(table_index_t i = queueIdx; i < rangingTableSet->counter - 1; i++) {
+    for(table_index_t i = queueIdx; i < rangingTableSet->size - 1; i++) {
         rangingTableSet->priorityQueue[i] = rangingTableSet->priorityQueue[i+1];
     }
-    rangingTableSet->priorityQueue[rangingTableSet->counter - 1] = NULL_INDEX;
-    rangingTableSet->counter--;
+    rangingTableSet->priorityQueue[rangingTableSet->size - 1] = NULL_INDEX;
+    rangingTableSet->size--;
 
     DEBUG_PRINT("Deregister ranging table entry: Address = %u\n", address);
 }
 
 // check expirationSign of rangingTables and deregister rangingTable expired
 void checkExpiration(Ranging_Table_Set_t *rangingTableSet) {
-    for(table_index_t i = rangingTableSet->counter; i > 0; i--) {
+    for(table_index_t i = rangingTableSet->size; i > 0; i--) {
         table_index_t idx = rangingTableSet->priorityQueue[i-1];
         if(rangingTableSet->rangingTable[idx].expirationSign == true) {
             deregisterRangingTable(rangingTableSet, rangingTableSet->rangingTable[idx].neighborAddress);
@@ -119,12 +120,12 @@ void checkExpiration(Ranging_Table_Set_t *rangingTableSet) {
 
 // find the index of rangingTable by address
 table_index_t findRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t address) {
-    if(rangingTableSet->counter == 0) {
+    if(rangingTableSet->size == 0) {
         // DEBUG_PRINT("Ranging table Set is empty, cannot find table\n");
         return NULL_INDEX;
     }
 
-    for (table_index_t i = 0; i < rangingTableSet->counter; i++) {
+    for (table_index_t i = 0; i < rangingTableSet->size; i++) {
         table_index_t idx = rangingTableSet->priorityQueue[i];
         if (rangingTableSet->rangingTable[idx].neighborAddress == address) {
             return idx;
@@ -482,12 +483,12 @@ void printRangingMessage(Ranging_Message_t *rangingMessage) {
     DEBUG_PRINT("srcAddress: %u\n", rangingMessage->header.srcAddress);
     DEBUG_PRINT("msgSequence: %u\n", rangingMessage->header.msgSequence);
 
-    DEBUG_PRINT("[Tr]\n");
+    DEBUG_PRINT("[Tx]\n");
     for(int i = 0; i < MESSAGE_TX_POOL_SIZE; i++) {
         DEBUG_PRINT("seqNumber: %u, timestamp: %llu\n", rangingMessage->header.Txtimestamps[i].seqNumber, rangingMessage->header.Txtimestamps[i].timestamp.full);
     }
 
-    DEBUG_PRINT("[Rr]:\n");
+    DEBUG_PRINT("[Rx]:\n");
     for(int i = 0; i < MESSAGE_BODY_UNIT_SIZE; i++){
         DEBUG_PRINT("address: %u, seqNumber: %u, timestamp: %llu\n", rangingMessage->bodyUnits[i].address, rangingMessage->bodyUnits[i].Rxtimestamp.seqNumber, rangingMessage->bodyUnits[i].Rxtimestamp.timestamp.full);
     }
@@ -496,7 +497,7 @@ void printRangingMessage(Ranging_Message_t *rangingMessage) {
 
 void printPriorityQueue(Ranging_Table_Set_t *rangingTableSet) {
     DEBUG_PRINT("\n[priorityQueue]\n");
-    for(int i = 0; i < rangingTableSet->counter; i++) {
+    for(int i = 0; i < rangingTableSet->size; i++) {
         DEBUG_PRINT("priority: %d -> neighborAddress: %u\n", i + 1, rangingTableSet->rangingTable[rangingTableSet->priorityQueue[i]].neighborAddress);
     }
 }
@@ -528,7 +529,7 @@ void printRangingTable(Ranging_Table_t *rangingTable) {
 
 void printRangingTableSet(Ranging_Table_Set_t *rangingTableSet) {
     DEBUG_PRINT("\n{rangingTableSet}\n");
-    DEBUG_PRINT("counter: %u\n", rangingTableSet->counter);
+    DEBUG_PRINT("size: %u\n", rangingTableSet->size);
     DEBUG_PRINT("localSeqNumber: %u\n", rangingTableSet->localSeqNumber);
 
     printPriorityQueue(rangingTableSet);
@@ -536,12 +537,12 @@ void printRangingTableSet(Ranging_Table_Set_t *rangingTableSet) {
     printSendList(&rangingTableSet->sendList);
 
     DEBUG_PRINT("\n[lastRxtimestamp]\n");
-    for(int i = 0; i < rangingTableSet->counter; i++) {
+    for(int i = 0; i < rangingTableSet->size; i++) {
         DEBUG_PRINT("neighborAddress: %u, seqNumber: %u, timestamp: %llu\n", rangingTableSet->rangingTable[i].neighborAddress, rangingTableSet->lastRxtimestamp[i].seqNumber, rangingTableSet->lastRxtimestamp[i].timestamp.full);
     }
 
     DEBUG_PRINT("\n[rangingTable]\n");
-    for(int i = 0; i < rangingTableSet->counter; i++) {
+    for(int i = 0; i < rangingTableSet->size; i++) {
         printRangingTable(&rangingTableSet->rangingTable[i]);
     }
 }

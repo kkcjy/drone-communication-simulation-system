@@ -130,12 +130,12 @@ typedef struct {
 } __attribute__((packed)) Ranging_Table_t;
 
 typedef struct {
-    uint16_t counter;                                       // number of neighbors
+    uint16_t size;                                          // number of neighbors
     uint32_t localSeqNumber;                                // seqNumber of message sent
     SendList_t sendList;                                    // timestamps of messages sent to neighbors
     Ranging_Table_t rangingTable[RANGING_TABLE_SIZE];
     Timestamp_Tuple_t lastRxtimestamp[RANGING_TABLE_SIZE];  
-    index_t priorityQueue[RANGING_TABLE_SIZE];              // used for choosing neighbors to send messages
+    index_t priorityQueue[RANGING_TABLE_SIZE];              // circular priority queue used for choosing neighbors to send messages
     SemaphoreHandle_t mutex;
 } __attribute__((packed)) Ranging_Table_Set_t;
 
