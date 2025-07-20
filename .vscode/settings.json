@@ -18,6 +18,8 @@
         "ranging_support.h": "c",
         "queue_task.h": "c",
         "random": "c",
-        "assert.h": "c"
+        "assert.h": "c",
+        "iterator": "c",
+        "stdlib.h": "c"
     }
 }

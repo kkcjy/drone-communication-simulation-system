@@ -4,7 +4,7 @@
 // #define         CLASSIC_TOF_ENABLE
 #define         COORDINATE_SEND_ENABLE
 // #define         COMPENSATE_ENABLE
-// #define         STATE_MACHINE_ENABLE
+#define         STATE_MACHINE_ENABLE
 
 #define         COMPENSATE_RATE             0.5
 
@@ -13,16 +13,16 @@
 #define         NULL_TIMESTAMP              0xFFFFFFFFU
 #define         NULL_INDEX                  0xFF
 #define         NULL_TOF                    -1.0f
-#define         INCOMPLETE_SIGN             -2.0f
-#define         MISORDER_SIGN               -3.0f
+#define         NULL_DIS                    -1.0f
 
 #define         table_index_t               uint8_t
-#define         index_t                     uint8_t
+#define         index_t                     uint16_t
 
 #define         MESSAGE_TX_POOL_SIZE        3
 #define         MESSAGE_BODY_UNIT_SIZE      2
 
 #define         SEND_LIST_SIZE              5
+#define         Tr_Rr_BUFFER_POOL_SIZE      3
 #define         RANGING_TABLE_SIZE          10        
 
 #define         UPPER_BOUND_DISTANCE        1000

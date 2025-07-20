@@ -2,9 +2,82 @@
 #include "ranging_struct.h"
 
 
-// determine whether the actual time_a is less than time_b
-bool COMPARE_TIME(Timestamp_Tuple_t time_a, Timestamp_Tuple_t time_b) {
-    return ((time_b.timestamp.full - time_a.timestamp.full) & UWB_MAX_TIMESTAMP) < UWB_MAX_TIMESTAMP/2;
+// comparison of valid parts of timestamps considering cyclic overflow(time_a < time_b)
+bool COMPARE_TIME(uint64_t time_a, uint64_t time_b) {
+    uint64_t diff = (time_b - time_a) & (UWB_MAX_TIMESTAMP - 1);
+    return diff < (UWB_MAX_TIMESTAMP - diff);
+}
+
+// search for index of send list whose Tx seqNumber is same as seqNumber
+index_t findSendList(SendList_t *sendList, uint16_t seqNumber) {
+    if(seqNumber == NULL_SEQ) {
+        return NULL_INDEX;
+    }
+    index_t index = sendList->topIndex;
+    for(int i = 0; i < SEND_LIST_SIZE; i++) {
+        if(sendList->Txtimestamps[index].seqNumber == seqNumber) {
+            return index;
+        }
+        index = (index - 1 + SEND_LIST_SIZE) % SEND_LIST_SIZE;
+    }
+    DEBUG_PRINT("Sequence number %u not found in send list\n", seqNumber);
+    return NULL_INDEX;
+}
+
+#ifdef COORDINATE_SEND_ENABLE
+// update the send list with new Tx and Rx timestamps with coordinate
+void updateSendList(SendList_t *sendList, Timestamp_Tuple_t timestampTuple, Coordinate_Tuple_t coordinateTuple) {
+    sendList->topIndex = (sendList->topIndex + 1) % SEND_LIST_SIZE;
+    sendList->Txtimestamps[sendList->topIndex] = timestampTuple;
+    sendList->TxCoordinate = coordinateTuple;
+}
+#else
+// update the send list with new Tx and Rx timestamps without coordinate
+void updateSendList(SendList_t *sendList, Timestamp_Tuple_t timestampTuple) {
+    sendList->topIndex = (sendList->topIndex + 1) % SEND_LIST_SIZE;
+    sendList->Txtimestamps[sendList->topIndex] = timestampTuple;
+}
+#endif
+
+void rangingTableTr_Rr_BufferInit(Ranging_Table_Tr_Rr_Buffer_t *rangingTableBuffer) {
+    rangingTableBuffer->topIndex = NULL_INDEX;
+    for (table_index_t i = 0; i < Tr_Rr_BUFFER_POOL_SIZE; i++) {
+        rangingTableBuffer->candidates[i].Tr = nullTimestampTuple;
+        rangingTableBuffer->candidates[i].Rr = nullTimestampTuple;
+    }
+}
+
+void updateRangingTableTr_Buffer(Ranging_Table_Tr_Rr_Buffer_t *rangingTableBuffer, Timestamp_Tuple_t Tr) {
+    rangingTableBuffer->candidates[rangingTableBuffer->topIndex].Tr = Tr;
+}
+
+void updateRangingTableRr_Buffer(Ranging_Table_Tr_Rr_Buffer_t *rangingTableBuffer, Timestamp_Tuple_t Rr) {
+    rangingTableBuffer->topIndex = (rangingTableBuffer->topIndex + 1) % Tr_Rr_BUFFER_POOL_SIZE;
+    rangingTableBuffer->candidates[rangingTableBuffer->topIndex].Tr = nullTimestampTuple;
+    rangingTableBuffer->candidates[rangingTableBuffer->topIndex].Rr = Rr;
+}
+
+Ranging_Table_Tr_Rr_Candidate_t rangingTableTr_Rr_BufferGetCandidate(Ranging_Table_Tr_Rr_Buffer_t *rangingTableBuffer, Timestamp_Tuple_t Rp, Timestamp_Tuple_t Tf) {
+    index_t index = rangingTableBuffer->topIndex;
+
+    uint64_t leftBound = Rp.timestamp.full % UWB_MAX_TIMESTAMP;
+    uint64_t rightBound = Tf.timestamp.full % UWB_MAX_TIMESTAMP;
+
+    Ranging_Table_Tr_Rr_Candidate_t candidate = nullCandidate;
+
+    for (int count = 0; count < Tr_Rr_BUFFER_POOL_SIZE; count++) {
+        if (rangingTableBuffer->candidates[index].Tr.timestamp.full 
+            && rangingTableBuffer->candidates[index].Rr.timestamp.full 
+            && COMPARE_TIME(leftBound, rangingTableBuffer->candidates[index].Tr.timestamp.full)
+            && COMPARE_TIME(rangingTableBuffer->candidates[index].Rr.timestamp.full, rightBound)) {      
+            candidate.Tr = rangingTableBuffer->candidates[index].Tr;
+            candidate.Rr = rangingTableBuffer->candidates[index].Rr;
+            break;
+        }
+        index = (index - 1 + Tr_Rr_BUFFER_POOL_SIZE) % Tr_Rr_BUFFER_POOL_SIZE;
+    }
+
+    return candidate;
 }
 
 void rangingTableInit(Ranging_Table_t *rangingTable) {
@@ -17,13 +90,15 @@ void rangingTableInit(Ranging_Table_t *rangingTable) {
     rangingTable->Rb = nullTimestampTuple;
     rangingTable->Tp = nullTimestampTuple;
     rangingTable->Rp = nullTimestampTuple;
-    rangingTable->Rr = nullTimestampTuple;
+    rangingTableTr_Rr_BufferInit(&rangingTable->TrRrBuffer);
+    rangingTable->Tf = nullTimestampTuple;
+    rangingTable->Rf = nullTimestampTuple;
+    rangingTable->Re = nullTimestampTuple;
 
     rangingTable->PTof = NULL_TOF;
     rangingTable->EPTof = NULL_TOF;
     rangingTable->continuitySign = false;
     rangingTable->expirationSign = true;
-    rangingTable->initCalculateRound = 0;
     rangingTable->tableState = UNUSED;
     #ifdef STATE_MACHINE_ENABLE
         rangingTable->rangingState = RANGING_STATE_RESERVED;
@@ -77,11 +152,7 @@ void deregisterRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t addre
         return;
     }
 
-    rangingTableSet->rangingTable[tableIdx].neighborAddress = NULL_ADDR;
-    rangingTableSet->rangingTable[tableIdx].tableState = UNUSED;
-    #ifdef STATE_MACHINE_ENABLE
-        rangingTableSet->rangingTable[tableIdx].rangingState = RANGING_STATE_RESERVED;
-    #endif
+    rangingTableInit(rangingTableSet->rangingTable);
 
     table_index_t queueIdx = NULL_INDEX;
     for(table_index_t i = 0; i < rangingTableSet->size; i++) {
@@ -105,19 +176,6 @@ void deregisterRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t addre
     DEBUG_PRINT("Deregister ranging table entry: Address = %u\n", address);
 }
 
-// check expirationSign of rangingTables and deregister rangingTable expired
-void checkExpiration(Ranging_Table_Set_t *rangingTableSet) {
-    for(table_index_t i = rangingTableSet->size; i > 0; i--) {
-        table_index_t idx = rangingTableSet->priorityQueue[i-1];
-        if(rangingTableSet->rangingTable[idx].expirationSign == true) {
-            deregisterRangingTable(rangingTableSet, rangingTableSet->rangingTable[idx].neighborAddress);
-        } 
-        else {
-            rangingTableSet->rangingTable[idx].expirationSign = true;
-        }
-    }
-}
-
 // find the index of rangingTable by address
 table_index_t findRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t address) {
     if(rangingTableSet->size == 0) {
@@ -135,59 +193,53 @@ table_index_t findRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t ad
     return NULL_INDEX;
 }
 
-/* shift Ranging Table
-               <-------------
-        <-------------              <------    
-    +------+------+------+------+------+------+
-    | ETb  | ERp  |  Tb  |  Rp  | EPTof| PTof |
-    +------+------+------+------+------+------+
-    | ERb  | ETp  |  Rb  |  Tp  |  Rr  | sign |
-    +------+------+------+------+------+------+
-        <-------------
-               <-------------
+/* fill Ranging Table
+    +------+------+------+------+------+------+                   +------+------+------+------+------+------+
+    | ETb  | ERp  |  Tb  |  Rp  |  Tr  |      |                   | ETb  | ERp  |  Tb  |  Rp  |  Tr  | [Rf] |
+    +------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+   
+    | ERb  | ETp  |  Rb  |  Tp  |  Rr  |      |      |    ===>    | ERb  | ETp  |  Rb  |  Tp  |  Rr  | [Tf] | [Re] |
+    +------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+   
+    |    EPTof    |    PTof     |                                 |    EPTof    |    PTof     |
+    +------+------+------+------+                                 +------+------+------+------+
 */
-void shiftRangingTable(Ranging_Table_t *rangingTable) {
+void fillRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tf, Timestamp_Tuple_t Rf, Timestamp_Tuple_t Re) {
+    rangingTable->Tf = Tf;
+    rangingTable->Rf = Rf;
+    rangingTable->Re = Re;
+}
+
+/* shift Ranging Table
+    +------+------+------+------+------+------+                   +------+------+------+------+------+------+
+    | ETb  | ERp  |  Tb  |  Rp  |  Tr  |  Rf  |                   |[ETb] |[ERp] | [Tb] | [Rp] |  Tr  |      |
+    +------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+   
+    | ERb  | ETp  |  Rb  |  Tp  |  Rr  |  Tf  |  Re  |    ===>    |[ERb] |[ETp] | [Rb] | [Tp] |  Rr  |      |      |
+    +------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+   
+    |    EPTof    |    PTof     |                                 |   [EPTof]   |   [PTof]    |
+    +------+------+------+------+                                 +------+------+------+------+
+*/
+void shiftRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr, Timestamp_Tuple_t Rr, float PTof) {
     rangingTable->ETb = rangingTable->Tb;
     rangingTable->ERb = rangingTable->Rb;
     rangingTable->ETp = rangingTable->Tp;
     rangingTable->ERp = rangingTable->Rp;
-
     rangingTable->EPTof = rangingTable->PTof;
 
-    rangingTable->Tb = nullTimestampTuple;
-    rangingTable->Rb = nullTimestampTuple;
-    rangingTable->Tp = nullTimestampTuple;
-    rangingTable->Rp = nullTimestampTuple;
-    rangingTable->Rr = nullTimestampTuple;
-
-    rangingTable->PTof = NULL_TOF;
-}
-
-/* fill Ranging Table
-                      <-- Tr <-- Rf        <-- PTof
-    +------+------+------+------+------+------+
-    | ETb  | ERp  |  Tb  |  Rp  | EPTof| PTof |
-    +------+------+------+------+------+------+
-    | ERb  | ETp  |  Rb  |  Tp  |  Rr  | sign |
-    +------+------+------+------+------+------+
-                      <-- Rr <-- Tf <-- Re <-- update
-*/
-void fillRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr, Timestamp_Tuple_t Rr, Timestamp_Tuple_t Tf, Timestamp_Tuple_t Rf, Timestamp_Tuple_t Re, float PTof) {
     rangingTable->Tb = Tr;
     rangingTable->Rb = Rr;
-    rangingTable->Tp = Tf;
-    rangingTable->Rp = Rf;
-    rangingTable->Rr = Re;
+    rangingTable->Tp = rangingTable->Tf;
+    rangingTable->Rp = rangingTable->Rf;
     rangingTable->PTof = PTof;
+
+    rangingTable->Tf = nullTimestampTuple;
+    rangingTable->Rf = nullTimestampTuple;
+    rangingTable->Re = nullTimestampTuple;
+
     // whether the table is contiguous
     if(rangingTable->ERb.seqNumber + 1 == rangingTable->Rb.seqNumber && rangingTable->ERp.seqNumber + 1 == rangingTable->Rp.seqNumber) {
         if(rangingTable->continuitySign == false) {
             rangingTable->continuitySign = true;
             // correcting PTof
-            Ranging_Table_t correctRangingTable;
-            correctRangingTable.Tp = rangingTable->ETp;
-            correctRangingTable.Rp = rangingTable->ERp;
-            float correctPTof = assistedCalculatePTof(&correctRangingTable, rangingTable->Tb, rangingTable->Rb, rangingTable->Tp, rangingTable->Rp);
+            float correctPTof = classicCalculatePTof(rangingTable->ETp, rangingTable->ERp, rangingTable->Tb, rangingTable->Rb, rangingTable->Tp, rangingTable->Rp);
             rangingTable->PTof = correctPTof;
             DEBUG_PRINT("[correct PTof]: correct PTof = %f\n", correctPTof);
         }
@@ -198,46 +250,109 @@ void fillRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr, Times
 }
 
 /* replace Ranging Table
-                      <-- Tr <-- Rf        <-- PTof
-    +------+------+------+------+------+------+
-    | ETb  | ERp  |  Tb  |  Rp  | EPTof| PTof |
-    +------+------+------+------+------+------+
-    | ERb  | ETp  |  Rb  |  Tp  |  Rr  | sign |
-    +------+------+------+------+------+------+
-                      <-- Rr <-- Tf
+    +------+------+------+------+------+------+                   +------+------+------+------+------+------+
+    | ETb  | ERp  |  Tb  |  Rp  |  Tr  |  Rf  |                   | ETb  | ERp  | [Tb] | [Rp] |  Tr  |      |
+    +------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+   
+    | ERb  | ETp  |  Rb  |  Tp  |  Rr  |  Tf  |  Re  |    ===>    | ERb  | ETp  | [Rb] | [Tp] |  Rr  |      |      |
+    +------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+   
+    |    EPTof    |    PTof     |                                 |    EPTof    |   [PTof]    |
+    +------+------+------+------+                                 +------+------+------+------+
 */
-void replaceRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr, Timestamp_Tuple_t Rr, Timestamp_Tuple_t Tf, Timestamp_Tuple_t Rf, Timestamp_Tuple_t Re, float PTof) {
-    rangingTable->Tb = Tr;
-    rangingTable->Rb = Rr;
-    rangingTable->Tp = Tf;
-    rangingTable->Rp = Rf;
-    rangingTable->Rr = Re;
+void replaceRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tb, Timestamp_Tuple_t Rb, Timestamp_Tuple_t Tp, Timestamp_Tuple_t Rp, float PTof) {
+    rangingTable->Tb = Tb;
+    rangingTable->Rb = Rb;
+    rangingTable->Tp = Tp;
+    rangingTable->Rp = Rp;
     rangingTable->PTof = PTof;
+
+    rangingTable->Tf = nullTimestampTuple;
+    rangingTable->Rf = nullTimestampTuple;
+    rangingTable->Re = nullTimestampTuple;
+
     rangingTable->continuitySign = false;
 }
 
-/* timestamps for assistedCalculatePTof
+// update the circular priority queue
+void updatePriorityQueue(Ranging_Table_Set_t *rangingTableSet, int8_t shiftCount) {
+    if(rangingTableSet->size <= 1 || shiftCount <= 0) {
+        return;
+    }
+
+    index_t *tmpQueue = malloc(sizeof(index_t) * shiftCount);
+
+    if(!tmpQueue) {
+        assert(0 && "Warning: Should not be called\n");
+    }
+
+    for(int i = 0; i < shiftCount; i++) {
+        tmpQueue[i] = rangingTableSet->priorityQueue[i];
+    }
+
+    int8_t idx = 0;
+
+    for(; idx < rangingTableSet->size; idx++) {
+        if(idx + shiftCount < rangingTableSet->size) {
+            rangingTableSet->priorityQueue[idx] = rangingTableSet->priorityQueue[idx + shiftCount];
+        }
+        else {
+            rangingTableSet->priorityQueue[idx] = tmpQueue[idx + shiftCount - rangingTableSet->size];
+        }
+    }
+
+    free(tmpQueue);
+}
+
+/* ranging algorithm
+    T1      <--Ra-->      R2    <--Da-->    T3
+
+       R1   <--Db-->    T2      <--Rb-->       R3
+*/
+float rangingAlgorithm(Timestamp_Tuple_t T1, Timestamp_Tuple_t R1, Timestamp_Tuple_t T2, Timestamp_Tuple_t R2, Timestamp_Tuple_t T3, Timestamp_Tuple_t R3, float Tof12) {
+    uint64_t Ra = (R2.timestamp.full - T1.timestamp.full + UWB_MAX_TIMESTAMP) % UWB_MAX_TIMESTAMP;
+    uint64_t Db = (T2.timestamp.full - R1.timestamp.full + UWB_MAX_TIMESTAMP) % UWB_MAX_TIMESTAMP;
+    uint64_t Da = (T3.timestamp.full - R2.timestamp.full + UWB_MAX_TIMESTAMP) % UWB_MAX_TIMESTAMP;
+    uint64_t Rb = (R3.timestamp.full - T2.timestamp.full + UWB_MAX_TIMESTAMP) % UWB_MAX_TIMESTAMP;
+
+    uint64_t diffA = Ra - Da;
+    uint64_t diffB = Rb - Db;
+
+    float Ra_Da = Ra / (float)Da;
+    float Rb_Db = Rb / (float)Db;
+
+    float Tof23 = NULL_TOF;
+
+    // meet the convergence condition
+    if(Ra_Da < CONVERGENCE_THRESHOLD || Rb_Db < CONVERGENCE_THRESHOLD) {
+        if(Ra_Da < Rb_Db) {
+            Tof23 = (float)((diffA * Rb + diffA * Db + diffB * Ra + diffB * Da) / 2.0f - Ra * Tof12) / (float)Da;
+        }
+        else {
+            Tof23 = (float)((diffA * Rb + diffA * Db + diffB * Ra + diffB * Da) / 2.0f - Rb * Tof12) / (float)Db;
+        }
+
+        // abnormal result
+        float D = (Tof23 * VELOCITY) / 2;
+        if(D < LOWER_BOUND_DISTANCE || D > UPPER_BOUND_DISTANCE) {
+            return NULL_TOF;
+        }
+    }
+
+    return Tof23;
+}
+
+/* timestamps for classicCalculatePTof
        Rp   <--Db-->    Tr      <--Rb-->       Rf
 
     Tp      <--Ra-->      Rr    <--Da-->    Tf
 */ 
-float assistedCalculatePTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr, Timestamp_Tuple_t Rr, Timestamp_Tuple_t Tf, Timestamp_Tuple_t Rf) {
-    Timestamp_Tuple_t Tp, Rp;
-    Tp = rangingTable->Tp;
-    Rp = rangingTable->Rp;
-
+float classicCalculatePTof(Timestamp_Tuple_t Tp, Timestamp_Tuple_t Rp, Timestamp_Tuple_t Tr, Timestamp_Tuple_t Rr, Timestamp_Tuple_t Tf, Timestamp_Tuple_t Rf) {
+    float curPTof = NULL_TOF;
+    
     // check completeness
     if(Tp.seqNumber == NULL_SEQ || Rp.seqNumber == NULL_SEQ || Tr.seqNumber == NULL_SEQ
         || Rr.seqNumber == NULL_SEQ || Tf.seqNumber == NULL_SEQ || Rf.seqNumber == NULL_SEQ) {
         DEBUG_PRINT("Warning: Data calculation is not complete\n");
-        return INCOMPLETE_SIGN;
-    }
-
-    // check orderliness
-    if(!(COMPARE_TIME(Tp, Rr) && COMPARE_TIME(Rr, Tf)
-        && COMPARE_TIME(Rp, Tr) && COMPARE_TIME(Tr, Rf))) {
-        DEBUG_PRINT("Warning: Data calculation is not in order\n");
-        return MISORDER_SIGN;
+        return NULL_TOF;
     }
 
     int64_t Ra = (Rr.timestamp.full - Tp.timestamp.full + UWB_MAX_TIMESTAMP) % UWB_MAX_TIMESTAMP;
@@ -248,233 +363,132 @@ float assistedCalculatePTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr,
     int64_t diffA = Ra - Da;
     int64_t diffB = Rb - Db;
 
-    float PTof = (diffA * Rb + diffA * Db + diffB * Ra + diffB * Da) / (float)(Ra + Db + Rb + Da);
+    curPTof = (diffA * Rb + diffA * Db + diffB * Ra + diffB * Da) / (float)(Ra + Db + Rb + Da);
 
-    return PTof;
+    return curPTof;
 }
 
 /* calculate the Time of Flight (Tof) based on the timestamps in the ranging table
     +------+------+------+------+------+------+
     | ETb  | ERp  |  Tb  |  Rp  |  Tr  |  Rf  |
-    +------+------+------+------+------+------+
-    | ERb  | ETp  |  Rb  |  Tp  |  Rr  |  Tf  |
-    +------+------+------+------+------+------+       
+    +------+------+------+------+------+------+------+
+    | ERb  | ETp  |  Rb  |  Tp  |  Rr  |  Tf  |  Re  |
+    +------+------+------+------+------+------+------+
+    |    EPTof    |    PTof     |
+    +------+------+------+------+
 */
-float calculatePTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr, Timestamp_Tuple_t Rr, Timestamp_Tuple_t Tf, Timestamp_Tuple_t Rf, CalculateState state) {
+float calculatePTof(Ranging_Table_t *rangingTable, Ranging_Table_Tr_Rr_Candidate_t candidate) {
+    Timestamp_Tuple_t Tr = candidate.Tr;
+    Timestamp_Tuple_t Rr = candidate.Rr;
+    Timestamp_Tuple_t Tf = rangingTable->Tf;
+    Timestamp_Tuple_t Rf = rangingTable->Rf;
+
+    float tmpPTof = NULL_TOF;
+    float curPTof = NULL_TOF;
+    
     // check completeness
-    if(state == FIRST_CALCULATE) {
-        if(rangingTable->Tb.seqNumber == NULL_SEQ || rangingTable->Rb.seqNumber == NULL_SEQ || rangingTable->Tp.seqNumber == NULL_SEQ || rangingTable->Rp.seqNumber == NULL_SEQ 
-            || Tr.seqNumber == NULL_SEQ || Rr.seqNumber == NULL_SEQ || Tf.seqNumber == NULL_SEQ || Rf.seqNumber == NULL_SEQ) {
-            DEBUG_PRINT("Warning: Data calculation is not complete\n");
-            return INCOMPLETE_SIGN;
-        }
-    }
-    else if(state == SECOND_CALCULATE) {
-        if(rangingTable->Tb.seqNumber == NULL_SEQ || rangingTable->Rb.seqNumber == NULL_SEQ || rangingTable->Tp.seqNumber == NULL_SEQ 
-            || rangingTable->Rp.seqNumber == NULL_SEQ || Tr.seqNumber == NULL_SEQ || Rr.seqNumber == NULL_SEQ) {
-            DEBUG_PRINT("Warning: Data calculation is not complete\n");
-            return INCOMPLETE_SIGN;
-        }
-    }
+    if(Tr.seqNumber == NULL_SEQ || Rr.seqNumber == NULL_SEQ || Tf.seqNumber == NULL_SEQ || Rf.seqNumber == NULL_SEQ) {
+        DEBUG_PRINT("Warning: Data calculation is not complete\n");
 
-/*
-first step:
-    try
-    Tb       <--Ra1-->       Rp    <--Da1-->    Tr
+        /* type1
+            +------+------+------+------+           +------+------+------+------+
+            |  Tb  |  Rp  |  Tr  |      |           | ERp  |  Tb  |  Rp  |  Tr  |
+            +------+------+------+------+   ===>    +------+------+------+------+
+            |  Rb  |  Tp  |  Rr  |      |           | ETp  |  Rb  |  Tp  |  Rr  |
+            +------+------+------+------+           +------+------+------+------+
+        */ 
+        if(Tr.seqNumber != NULL_SEQ && Rr.seqNumber != NULL_SEQ) {
+            tmpPTof = rangingAlgorithm(rangingTable->ETp, rangingTable->ERp, 
+                                             rangingTable->Tb, rangingTable->Rb, 
+                                             rangingTable->Tp, rangingTable->Rp, (rangingTable->EPTof + rangingTable->PTof) / 2);
 
-       Rb    <--Db1-->    Tp       <--Rb1-->       Rr
-
-    retry
-   ETb       <--Ra1-->      ERp    <--Da1-->    Tr
-
-      ERb    <--Db1-->   ETp       <--Rb1-->       Rr
-----------------------------------------------------------------------
-    Tof23 = Tof4 + Tofx = (Ra1 * Rb1 - Da1 * Db1) / Db1 - (Rb1 * PTof) / Db1
-*/
-    float Tof23 = NULL_TOF;
-
-    // check orderliness
-    if(!(COMPARE_TIME(rangingTable->Rb, rangingTable->Tp) && COMPARE_TIME(rangingTable->Tp, Rr)
-        && COMPARE_TIME(rangingTable->Tb, rangingTable->Rp) && COMPARE_TIME(rangingTable->Rp, Tr))) {
-        DEBUG_PRINT("Warning: Data calculation is not in order\n");
-    }
-
-    int64_t Ra1 = (rangingTable->Rp.timestamp.full - rangingTable->Tb.timestamp.full + UWB_MAX_TIMESTAMP) % UWB_MAX_TIMESTAMP;
-    int64_t Db1 = (rangingTable->Tp.timestamp.full - rangingTable->Rb.timestamp.full + UWB_MAX_TIMESTAMP) % UWB_MAX_TIMESTAMP;
-    int64_t Rb1 = (Rr.timestamp.full - rangingTable->Tp.timestamp.full + UWB_MAX_TIMESTAMP) % UWB_MAX_TIMESTAMP;
-    int64_t Da1 = (Tr.timestamp.full - rangingTable->Rp.timestamp.full + UWB_MAX_TIMESTAMP) % UWB_MAX_TIMESTAMP;
-
-    int64_t diffA1 = Ra1 - Da1;
-    int64_t diffB1 = Rb1 - Db1;
-
-    float Ra_Da_1 = Ra1 / (float)Da1;
-    float Rb_Db_1 = Rb1 / (float)Db1;
-
-    // meet the convergence condition
-    if(Ra_Da_1 < CONVERGENCE_THRESHOLD || Rb_Db_1 < CONVERGENCE_THRESHOLD) {
-        if(Ra_Da_1 < Rb_Db_1) {
-            Tof23 = (float)((diffA1 * Rb1 + diffA1 * Db1 + diffB1 * Ra1 + diffB1 * Da1) / 2 - Ra1 * rangingTable->PTof) / (float)Da1;
-        }
-        else {
-            Tof23 = (float)((diffA1 * Rb1 + diffA1 * Db1 + diffB1 * Ra1 + diffB1 * Da1) / 2 - Rb1 * rangingTable->PTof) / (float)Db1;
-        }
-
-        // abnormal result
-        float D = (Tof23 * VELOCITY) / 2;
-        if(D < LOWER_BOUND_DISTANCE || D > UPPER_BOUND_DISTANCE) {
-            if(state == FIRST_CALCULATE) {
-                DEBUG_PRINT("Warning: D = %f is out of range of(%d, %d), retry to calculate\n", D, LOWER_BOUND_DISTANCE, UPPER_BOUND_DISTANCE);
-                #if defined(CLASSIC_TOF_ENABLE)
-                    // fallback to classic PTof calculation
-                    Tof23 = (diffA1 * Rb1 + diffA1 * Db1 + diffB1 * Ra1 + diffB1 * Da1) / (float)(Ra1 + Db1 + Rb1 + Da1);
-                    goto POINT_1;
-                #else
-                    // fallback to second calling PTof calculation
-                    Ranging_Table_t replicaTable;
-                    replicaTable.Tb = rangingTable->ETb;
-                    replicaTable.Rb = rangingTable->ERb;
-                    replicaTable.Tp = rangingTable->ETp;
-                    replicaTable.Rp = rangingTable->ERp;
-                    replicaTable.PTof = rangingTable->EPTof;
-
-                    Tof23 = calculatePTof(&replicaTable, Tr, Rr, nullTimestampTuple, nullTimestampTuple, SECOND_CALCULATE);
-                    goto POINT_1;
-                #endif
+            if(tmpPTof != NULL_TOF) {
+                curPTof = rangingAlgorithm(rangingTable->Tb, rangingTable->Rb, 
+                                           rangingTable->Tp, rangingTable->Rp,
+                                           Tr, Rr, tmpPTof);
+                // use tmpPTof as the estimated value
+                curPTof = (curPTof == NULL_TOF) ? tmpPTof : curPTof;
             }
-            else if(state == SECOND_CALCULATE) {
+            else {
                 return NULL_TOF;
             }
         }
+        
+        /* type2
+            +------+------+------+------+           +------+------+------+------+
+            |  Tb  |  Rp  |      |  Rf  |           | ETb  | ERp  |  Tb  |  Rp  |
+            +------+------+------+------+   ===>    +------+------+------+------+
+            |  Rb  |  Tp  |      |  Tf  |           | ERb  | ETp  |  Rb  |  Tp  |
+            +------+------+------+------+           +------+------+------+------+
+        */
+        else if(Tf.seqNumber != NULL_SEQ && Rf.seqNumber != NULL_SEQ) {
+            tmpPTof = rangingAlgorithm(rangingTable->ETb, rangingTable->ERb, 
+                                             rangingTable->ETp, rangingTable->ERp, 
+                                             rangingTable->Tb, rangingTable->Rb, (rangingTable->EPTof + rangingTable->PTof) / 2);
 
-        if(state == SECOND_CALCULATE) {
-            return Tof23;
+            if(tmpPTof != NULL_TOF) {
+                curPTof = rangingAlgorithm(rangingTable->ETp, rangingTable->ERp, 
+                                           rangingTable->Tb, rangingTable->Rb,
+                                           rangingTable->Tp, rangingTable->Rp, tmpPTof);
+                // use tmpPTof as the estimated value
+                curPTof = (curPTof == NULL_TOF) ? tmpPTof : curPTof;
+            }
+            else {
+                return NULL_TOF;
+            }
         }
-    }
-
-    // beyond the convergence condition
-    else {
-        if(state == FIRST_CALCULATE) {
-            DEBUG_PRINT("Warning: Ra1/Da1 and Rb1/Db1 are both greater than CONVERGENCE_THRESHOLD = %f, Ra1 = %d, Da1 = %d, Rb1 = %d, Db1 = %d, Ra_Da_1 = %f, Rb_Db_1 = %f, retry to calculate\n", CONVERGENCE_THRESHOLD, Ra1, Da1, Rb1, Db1, Ra_Da_1, Rb_Db_1);
-            #if defined(CLASSIC_TOF_ENABLE)
-                // fallback to classic PTof calculation
-                Tof23 = (diffA1 * Rb1 + diffA1 * Db1 + diffB1 * Ra1 + diffB1 * Da1) / (float)(Ra1 + Db1 + Rb1 + Da1);
-                goto POINT_1;
-            #else
-                // fallback to second calling PTof calculation
-                Ranging_Table_t replicaTable;
-                replicaTable.Tb = rangingTable->ETb;
-                replicaTable.Rb = rangingTable->ERb;
-                replicaTable.Tp = rangingTable->ETp;
-                replicaTable.Rp = rangingTable->ERp;
-                replicaTable.PTof = rangingTable->EPTof;
-
-                Tof23 = calculatePTof(&replicaTable, Tr, Rr, nullTimestampTuple, nullTimestampTuple, SECOND_CALCULATE);
-                goto POINT_1;
-            #endif
-        }
-        else if(state == SECOND_CALCULATE) {
+        
+        /* type3
+            +------+------+------+------+      
+            |  Tb  |  Rp  |      |      |          
+            +------+------+------+------+   ===>    PTof
+            |  Rb  |  Tp  |      |      |           
+            +------+------+------+------+  
+        */
+        else {
             return NULL_TOF;
         }
     }
 
-POINT_1:
+    else {
+        /* type4
+     
+            +------+------+------+------+
+            |  Tb  |  Rp  |  Tr  |  Rf  |
+            +------+------+------+------+   
+            |  Rb  |  Tp  |  Rr  |  Tf  | 
+            +------+------+------+------+    
+        */ 
+        tmpPTof = rangingAlgorithm(rangingTable->Tb, rangingTable->Rb, 
+                                         rangingTable->Tp, rangingTable->Rp, 
+                                         Tr, Rr, rangingTable->PTof);
 
-/*
-second step:
-    try
-       Rp    <--Db2-->    Tr      <--Rb2-->       Rf
-
-    Tp       <--Ra2-->      Rr    <--Da2-->    Tf
-
-    retry
-      ERp    <--Db2-->    Tb      <--Rb2-->       Rf
-
-   ETp       <--Ra2-->      Rb    <--Da2-->    Tf
-----------------------------------------------------------------------
-    Tof34 = Tofx + Tofn = (Ra2 * Rb2 - Da2 * Db2) / Db2 - Rb2 * Tof23 / Db2
-*/
-    float Tof34 = NULL_TOF;
-
-     // check orderliness
-    if(!(COMPARE_TIME(rangingTable->Tp, Rr) && COMPARE_TIME(Rr, Tf)
-        && COMPARE_TIME(rangingTable->Rp, Tr) && COMPARE_TIME(Tr, Rf))) {
-        DEBUG_PRINT("Warning: Data calculation is not in order\n");
-        return MISORDER_SIGN;
-    }
-
-    int64_t Ra2 = (Rr.timestamp.full - rangingTable->Tp.timestamp.full + UWB_MAX_TIMESTAMP) % UWB_MAX_TIMESTAMP;
-    int64_t Db2 = (Tr.timestamp.full - rangingTable->Rp.timestamp.full + UWB_MAX_TIMESTAMP) % UWB_MAX_TIMESTAMP;
-    int64_t Rb2 = (Rf.timestamp.full - Tr.timestamp.full + UWB_MAX_TIMESTAMP) % UWB_MAX_TIMESTAMP;
-    int64_t Da2 = (Tf.timestamp.full - Rr.timestamp.full + UWB_MAX_TIMESTAMP) % UWB_MAX_TIMESTAMP;
-    
-    int64_t diffA2 = Ra2 - Da2;
-    int64_t diffB2 = Rb2 - Db2;
-    float Ra_Da_2 = Ra2 / (float)Da2;
-    float Rb_Db_2 = Rb2 / (float)Db2;
-
-    if(Ra_Da_2 < CONVERGENCE_THRESHOLD || Rb_Db_2 < CONVERGENCE_THRESHOLD) {
-        if(Ra_Da_2 < Rb_Db_2) {
-            Tof34 = (float)((diffA2 * Rb2 + diffA2 * Db2 + diffB2 * Ra2 + diffB2 * Da2) / 2 - Ra2 * Tof23) / (float)Da2;
+        if(tmpPTof != NULL_TOF) {
+            curPTof = rangingAlgorithm(rangingTable->Tp, rangingTable->Rp, 
+                                       Tr, Rr,
+                                       rangingTable->Tf, rangingTable->Rf, tmpPTof);
+            // use tmpPTof as the estimated value
+            curPTof = (curPTof == NULL_TOF) ? tmpPTof : curPTof;
         }
         else {
-            Tof34 = (float)((diffA2 * Rb2 + diffA2 * Db2 + diffB2 * Ra2 + diffB2 * Da2) / 2 - Rb2 * Tof23) / (float)Db2;
-        }
-
-        // abnormal result
-        float D = (Tof34 * VELOCITY) / 2;
-        if(D < LOWER_BOUND_DISTANCE || D > UPPER_BOUND_DISTANCE) {
-            if(state == FIRST_CALCULATE) {
-                DEBUG_PRINT("Warning: D = %f is out of range of(%d, %d), retry to calculate\n", D, LOWER_BOUND_DISTANCE, UPPER_BOUND_DISTANCE);
-                #if defined(CLASSIC_TOF_ENABLE)
-                    // fallback to classic PTof calculation
-                    Tof34 = (diffA2 * Rb2 + diffA2 * Db2 + diffB2 * Ra2 + diffB2 * Da2) / (float)(Ra2 + Db2 + Rb2 + Da2);
-                    goto POINT_2;
-                #else
-                    // fallback to second calling PTof calculation
-                    Ranging_Table_t replicaTable;
-                    replicaTable.Tb = rangingTable->ETp;
-                    replicaTable.Rb = rangingTable->ERp;
-                    replicaTable.Tp = rangingTable->Tb;
-                    replicaTable.Rp = rangingTable->Rb;
-                    replicaTable.PTof = (rangingTable->PTof + rangingTable->EPTof) / 2;
-
-                    Tof34 = calculatePTof(&replicaTable, Tf, Rf, nullTimestampTuple, nullTimestampTuple, SECOND_CALCULATE);
-                    goto POINT_2;
-                #endif
-            }
-            else if(state == SECOND_CALCULATE) {
-                assert(0 && "Warning: Should not be called\n");
-            }
-        }
-    } 
-    else {
-        if(state == FIRST_CALCULATE) {
-            DEBUG_PRINT("Warning: Ra2/Da2 and Rb2/Db2 are both greater than CONVERGENCE_THRESHOLD = %f, Ra2 = %d, Da2 = %d, Rb2 = %d, Db2 = %d, Ra_Da_2 = %f, Rb_Db_2 = %f, retry to calculate\n", CONVERGENCE_THRESHOLD, Ra2, Da2, Rb2, Db2, Ra_Da_2, Rb_Db_2);
-            #if defined(CLASSIC_TOF_ENABLE)
-                // fallback to classic PTof calculation
-                Tof34 = (diffA2 * Rb2 + diffA2 * Db2 + diffB2 * Ra2 + diffB2 * Da2) / (float)(Ra2 + Db2 + Rb2 + Da2);
-                goto POINT_2;
-            #else
-                // fallback to second calling PTof calculation
-                Ranging_Table_t replicaTable;
-                replicaTable.Tb = rangingTable->ETp;
-                replicaTable.Rb = rangingTable->ERp;
-                replicaTable.Tp = rangingTable->Tb;
-                replicaTable.Rp = rangingTable->Rb;
-                replicaTable.PTof = (rangingTable->PTof + rangingTable->EPTof) / 2;
-
-                Tof34 = calculatePTof(&replicaTable, Tf, Rf, nullTimestampTuple, nullTimestampTuple, SECOND_CALCULATE);
-                goto POINT_2;
-            #endif
-        }
-        else if(state == SECOND_CALCULATE) {
-            assert(0 && "Warning: Should not be called\n");
+            return NULL_TOF;
         }
     }
 
-POINT_2:
+    return curPTof;
+}
 
-    return Tof34;
+// check expirationSign of rangingTables and deregister rangingTable expired
+void checkExpiration(Ranging_Table_Set_t *rangingTableSet) {
+    for(table_index_t i = rangingTableSet->size; i > 0; i--) {
+        table_index_t idx = rangingTableSet->priorityQueue[i-1];
+        if(rangingTableSet->rangingTable[idx].expirationSign == true) {
+            deregisterRangingTable(rangingTableSet, rangingTableSet->rangingTable[idx].neighborAddress);
+        } 
+        else {
+            rangingTableSet->rangingTable[idx].expirationSign = true;
+        }
+    }
 }
 
 void printRangingMessage(Ranging_Message_t *rangingMessage) {
@@ -493,13 +507,6 @@ void printRangingMessage(Ranging_Message_t *rangingMessage) {
         DEBUG_PRINT("address: %u, seqNumber: %u, timestamp: %llu\n", rangingMessage->bodyUnits[i].address, rangingMessage->bodyUnits[i].Rxtimestamp.seqNumber, rangingMessage->bodyUnits[i].Rxtimestamp.timestamp.full);
     }
     DEBUG_PRINT("\n");
-}
-
-void printPriorityQueue(Ranging_Table_Set_t *rangingTableSet) {
-    DEBUG_PRINT("\n[priorityQueue]\n");
-    for(int i = 0; i < rangingTableSet->size; i++) {
-        DEBUG_PRINT("priority: %d -> neighborAddress: %u\n", i + 1, rangingTableSet->rangingTable[rangingTableSet->priorityQueue[i]].neighborAddress);
-    }
 }
 
 void printSendList(SendList_t *sendList) {
@@ -522,9 +529,26 @@ void printRangingTable(Ranging_Table_t *rangingTable) {
     DEBUG_PRINT("(Rb) seqNumber: %u, timestamp: %llu\n", rangingTable->Rb.seqNumber, rangingTable->Rb.timestamp.full);
     DEBUG_PRINT("(Tp) seqNumber: %u, timestamp: %llu\n", rangingTable->Tp.seqNumber, rangingTable->Tp.timestamp.full);
     DEBUG_PRINT("(Rp) seqNumber: %u, timestamp: %llu\n", rangingTable->Rp.seqNumber, rangingTable->Rp.timestamp.full);
-    DEBUG_PRINT("(Rr) seqNumber: %u, timestamp: %llu\n", rangingTable->Rr.seqNumber, rangingTable->Rr.timestamp.full);
-
+    DEBUG_PRINT("(Tr_Rr_Buffer)\n");
+    index_t index = rangingTable->TrRrBuffer.topIndex;
+    for(int i = 0; i < Tr_Rr_BUFFER_POOL_SIZE; i++) {
+        DEBUG_PRINT("\tseqNumber: %u, timestamp: %llu  -->  seqNumber: %u, timestamp: %llu\n", 
+            rangingTable->TrRrBuffer.candidates[index].Tr.seqNumber, rangingTable->TrRrBuffer.candidates[index].Tr.timestamp.full,
+            rangingTable->TrRrBuffer.candidates[index].Rr.seqNumber, rangingTable->TrRrBuffer.candidates[index].Rr.timestamp.full);
+        index = (index - 1 + Tr_Rr_BUFFER_POOL_SIZE) % Tr_Rr_BUFFER_POOL_SIZE;
+    }
+    DEBUG_PRINT("(Tf) seqNumber: %u, timestamp: %llu\n", rangingTable->Tf.seqNumber, rangingTable->Tf.timestamp.full);
+    DEBUG_PRINT("(Rf) seqNumber: %u, timestamp: %llu\n", rangingTable->Rf.seqNumber, rangingTable->Rf.timestamp.full);
+    DEBUG_PRINT("(Re) seqNumber: %u, timestamp: %llu\n", rangingTable->Re.seqNumber, rangingTable->Re.timestamp.full);
+    
     DEBUG_PRINT("PTof = %f, EPTof = %f, continuitySign = %s\n", rangingTable->PTof, rangingTable->EPTof, rangingTable->continuitySign == true ? "true" : "false");
+}
+
+void printPriorityQueue(Ranging_Table_Set_t *rangingTableSet) {
+    DEBUG_PRINT("\n[priorityQueue]\n");
+    for(int i = 0; i < rangingTableSet->size; i++) {
+        DEBUG_PRINT("priority: %d -> neighborAddress: %u\n", i + 1, rangingTableSet->rangingTable[rangingTableSet->priorityQueue[i]].neighborAddress);
+    }
 }
 
 void printRangingTableSet(Ranging_Table_Set_t *rangingTableSet) {
@@ -547,7 +571,7 @@ void printRangingTableSet(Ranging_Table_Set_t *rangingTableSet) {
     }
 }
 
-void printAssistedCalculateTuple(Timestamp_Tuple_t Tp, Timestamp_Tuple_t Rp, Timestamp_Tuple_t Tr, Timestamp_Tuple_t Rr, Timestamp_Tuple_t Tf, Timestamp_Tuple_t Rf) {
+void printclassicCalculateTuple(Timestamp_Tuple_t Tp, Timestamp_Tuple_t Rp, Timestamp_Tuple_t Tr, Timestamp_Tuple_t Rr, Timestamp_Tuple_t Tf, Timestamp_Tuple_t Rf) {
     DEBUG_PRINT("\nRp[seq=%u, ts=%llu] <--%llu--> Tr[seq=%u, ts=%llu] <--%llu--> Rf[seq=%u, ts=%llu]\n",
         Rp.seqNumber, Rp.timestamp.full, Tr.timestamp.full - Rp.timestamp.full, Tr.seqNumber, Tr.timestamp.full, Rf.timestamp.full - Tr.timestamp.full, Rf.seqNumber, Rf.timestamp.full);
     DEBUG_PRINT("\nTp[seq=%u, ts=%llu] <--%llu--> Rr[seq=%u, ts=%llu] <--%llu--> Tf[seq=%u, ts=%llu]\n",

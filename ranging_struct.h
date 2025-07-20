@@ -20,9 +20,6 @@ typedef struct {
     uint16_t z;
 } __attribute__((packed)) Coordinate_Tuple_t;
 
-static const Timestamp_Tuple_t nullTimestampTuple = {.timestamp.full = NULL_TIMESTAMP, .seqNumber = NULL_SEQ};
-static const Coordinate_Tuple_t nullCoordinateTuple = {.x = -1, .y = -1, .z = -1};
-
 typedef enum {
     UNUSED,
     USING
@@ -85,23 +82,33 @@ typedef struct {
 
 // -------------------- Ranging Table --------------------
 typedef struct {
-    uint8_t topIndex;
+    index_t topIndex;
     Timestamp_Tuple_t Txtimestamps[SEND_LIST_SIZE];
     #ifdef COORDINATE_SEND_ENABLE
     Coordinate_Tuple_t TxCoordinate;    // local coordinate when message is sent
     #endif
 } __attribute__((packed)) SendList_t;
 
+typedef struct {
+    Timestamp_Tuple_t Tr;
+    Timestamp_Tuple_t Rr;
+} __attribute__((packed)) Ranging_Table_Tr_Rr_Candidate_t;
+
+typedef struct {
+    index_t topIndex;                   // index of latest valid (Tr,Rr) pair
+    Ranging_Table_Tr_Rr_Candidate_t candidates[Tr_Rr_BUFFER_POOL_SIZE];
+} __attribute__((packed)) Ranging_Table_Tr_Rr_Buffer_t;
+
 /* Ranging Table
     +------+------+------+------+------+------+
-    | ETb  | ERp  |  Tb  |  Rp  | EPTof| PTof |
-    +------+------+------+------+------+------+
-    | ERb  | ETp  |  Rb  |  Tp  |  Rr  | sign |
-    +------+------+------+------+------+------+
-    Note:       1. EPTof = Tof1 + Tof2 = Tof12
-                2. PTof = Tof3 + Tof4 = Tof34
-    Calculate:  1. Tof12 -> Tof23 -> Tof34 => PTof = Tof34 / 2
-                2. Tof12 -> Tof23 -> Tof34 => PTof = (Tof23 + Tof34) / 4 + Compensate
+    | ETb  | ERp  |  Tb  |  Rp  |  Tr  |  Rf  |
+    +------+------+------+------+------+------+------+
+    | ERb  | ETp  |  Rb  |  Tp  |  Rr  |  Tf  |  Re  |
+    +------+------+------+------+------+------+------+
+    |    EPTof    |    PTof     |
+    +------+------+------+------+
+    Note:   1. EPTof = Tof_eb + Tof_ep = Tof_ebep
+            2. PTof = Tof_b + Tofp = Tof_bp
 */
 typedef struct {
     uint16_t neighborAddress;
@@ -114,14 +121,16 @@ typedef struct {
     Timestamp_Tuple_t Rb;
     Timestamp_Tuple_t Tp;
     Timestamp_Tuple_t Rp;
-    Timestamp_Tuple_t Rr;               // last timestamp of message received from neighbor
+    Ranging_Table_Tr_Rr_Buffer_t TrRrBuffer;
+    Timestamp_Tuple_t Tf;
+    Timestamp_Tuple_t Rf;
+    Timestamp_Tuple_t Re;
 
     float PTof;                         // pair of Tof
     float EPTof;                        // early pair of Tof
 
     bool continuitySign;                // true: contiguous | false: non-contiguous
     bool expirationSign;                // true: no recent access --> expired | recent access --> not expired
-    int8_t initCalculateRound;          // used for initCalculatePTof
 
     TableState tableState;              // UNUSED / USING
     #ifdef STATE_MACHINE_ENABLE
@@ -140,23 +149,46 @@ typedef struct {
 } __attribute__((packed)) Ranging_Table_Set_t;
 
 
-bool COMPARE_TIME(Timestamp_Tuple_t time_a, Timestamp_Tuple_t time_b);
+static const Timestamp_Tuple_t nullTimestampTuple = {.timestamp.full = NULL_TIMESTAMP, .seqNumber = NULL_SEQ};
+static const Coordinate_Tuple_t nullCoordinateTuple = {.x = -1, .y = -1, .z = -1};
+static const Ranging_Table_Tr_Rr_Candidate_t nullCandidate = {.Tr.timestamp.full = NULL_TIMESTAMP, .Tr.seqNumber = NULL_SEQ, .Rr.timestamp.full = NULL_TIMESTAMP, .Rr.seqNumber = NULL_SEQ,};
+
+
+bool COMPARE_TIME(uint64_t time_a, uint64_t time_b);
+
+index_t findSendList(SendList_t *sendList, uint16_t seqNumber);
+#ifdef COORDINATE_SEND_ENABLE
+void updateSendList(SendList_t *sendList, Timestamp_Tuple_t timestampTuple, Coordinate_Tuple_t coordinateTuple);
+#else
+void updateSendList(SendList_t *sendList, Timestamp_Tuple_t timestampTuple);
+#endif
+
+void rangingTableTr_Rr_BufferInit(Ranging_Table_Tr_Rr_Buffer_t *rangingTableBuffer);
+void updateRangingTableTr_Buffer(Ranging_Table_Tr_Rr_Buffer_t *rangingTableBuffer, Timestamp_Tuple_t Tr);
+void updateRangingTableRr_Buffer(Ranging_Table_Tr_Rr_Buffer_t *rangingTableBuffer, Timestamp_Tuple_t Rr);
+Ranging_Table_Tr_Rr_Candidate_t rangingTableTr_Rr_BufferGetCandidate(Ranging_Table_Tr_Rr_Buffer_t *rangingTableBuffer, Timestamp_Tuple_t Rp, Timestamp_Tuple_t Tf);
+
 void rangingTableInit(Ranging_Table_t *rangingTable);
 table_index_t registerRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t address);
 void deregisterRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t address);
-void checkExpiration(Ranging_Table_Set_t *rangingTableSet);
 table_index_t findRangingTable(Ranging_Table_Set_t *rangingTableSet, uint16_t address);
-void shiftRangingTable(Ranging_Table_t *rangingTable);
-void fillRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr, Timestamp_Tuple_t Rr, Timestamp_Tuple_t Tf, Timestamp_Tuple_t Rf, Timestamp_Tuple_t Re, float PTof);
-void replaceRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr, Timestamp_Tuple_t Rr, Timestamp_Tuple_t Tf, Timestamp_Tuple_t Rf, Timestamp_Tuple_t Re, float PTof);
-float assistedCalculatePTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr, Timestamp_Tuple_t Rr, Timestamp_Tuple_t Tf, Timestamp_Tuple_t Rf);
-float calculatePTof(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr, Timestamp_Tuple_t Rr, Timestamp_Tuple_t Tf, Timestamp_Tuple_t Rf, CalculateState state);
+void fillRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tf, Timestamp_Tuple_t Rf, Timestamp_Tuple_t Re);
+void shiftRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tr, Timestamp_Tuple_t Rr, float PTof);
+void replaceRangingTable(Ranging_Table_t *rangingTable, Timestamp_Tuple_t Tb, Timestamp_Tuple_t Rb, Timestamp_Tuple_t Tp, Timestamp_Tuple_t Rp, float PTof);
+
+void updatePriorityQueue(Ranging_Table_Set_t *rangingTableSet, int8_t shiftCount);
+
+float classicCalculatePTof(Timestamp_Tuple_t Tp, Timestamp_Tuple_t Rp, Timestamp_Tuple_t Tr, Timestamp_Tuple_t Rr, Timestamp_Tuple_t Tf, Timestamp_Tuple_t Rf);
+float calculatePTof(Ranging_Table_t *rangingTable, Ranging_Table_Tr_Rr_Candidate_t candidate);
+
+void checkExpiration(Ranging_Table_Set_t *rangingTableSet);
+
 void printRangingMessage(Ranging_Message_t *rangingMessage);
-void printPriorityQueue(Ranging_Table_Set_t *rngingTableSet);
 void printSendList(SendList_t *sendList);
 void printRangingTable(Ranging_Table_t *rangingTable);
+void printPriorityQueue(Ranging_Table_Set_t *rangingTableSet);
 void printRangingTableSet(Ranging_Table_Set_t *rangingTableSet);
-void printAssistedCalculateTuple(Timestamp_Tuple_t Tp, Timestamp_Tuple_t Rp, Timestamp_Tuple_t Tr, Timestamp_Tuple_t Rr, Timestamp_Tuple_t Tf, Timestamp_Tuple_t Rf);
+void printclassicCalculateTuple(Timestamp_Tuple_t Tp, Timestamp_Tuple_t Rp, Timestamp_Tuple_t Tr, Timestamp_Tuple_t Rr, Timestamp_Tuple_t Tf, Timestamp_Tuple_t Rf);
 void printCalculateTuple(Timestamp_Tuple_t ETb, Timestamp_Tuple_t ERb, Timestamp_Tuple_t ETp, Timestamp_Tuple_t ERp, Timestamp_Tuple_t Tb, Timestamp_Tuple_t Rb, Timestamp_Tuple_t Tp, Timestamp_Tuple_t Rp);
 
 #endif
