@@ -1,6 +1,7 @@
 #ifndef SOCKET_FRAME_H
 #define SOCKET_FRAME_H
 
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,7 +11,8 @@
 #include <netinet/in.h>
 #include <pthread.h>
 
-#include "ranging_protocol.h"
+#include "dynamic_swarm_ranging.h"
+
 
 #define     MAX_NODES       10
 #define     BUFFER_SIZE     1024
@@ -18,6 +20,7 @@
 #define     MESSAGE_SIZE    BUFFER_SIZE - ID_SIZE - sizeof(size_t)
 #define     CENTER_PORT     8888
 #define     REJECT_INFO     "REJECT"
+
 
 typedef struct {
     char sender_id[ID_SIZE];

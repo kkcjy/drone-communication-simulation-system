@@ -1,7 +1,8 @@
 #include "socket_frame.h"
 #include "local_host.h"
 #include "queue_task.h"
-#include "ranging_struct.h"
+#include "dynamic_swarm_ranging.h"
+
 
 const char *local_drone_id;            
 extern Local_Host_t *localHost;     

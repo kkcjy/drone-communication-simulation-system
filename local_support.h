@@ -2,6 +2,7 @@
 #define RANGING_LOCAL_SUPPORT_H
 #define _POSIX_C_SOURCE 200809L
 
+
 #include <assert.h>
 #include <limits.h>
 #include <math.h>
@@ -80,6 +81,12 @@ typedef struct {
     int y;
     int z;
 } __attribute__((packed)) Velocity_Tuple_t;
+
+typedef struct {
+    uint16_t x;
+    uint16_t y;
+    uint16_t z;
+} __attribute__((packed)) Coordinate_Tuple_t;
 
 typedef union {
 	uint8_t raw[5];

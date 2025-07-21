@@ -1,9 +1,11 @@
 #ifndef LOCK_H
 #define LOCK_H
 
-#include "ranging_local_support.h"
+
+#include "local_support.h"
 #include "local_host.h"
-#include "ranging_struct.h"
+#include "dynamic_swarm_ranging.h"
+
 
 typedef struct {
     void *data;

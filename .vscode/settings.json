@@ -7,7 +7,7 @@
         "stdint.h": "c",
         "algorithm": "c",
         "ranging_struct.h": "c",
-        "ranging_local_support.h": "c",
+        "local_support.h": "c",
         "stdio.h": "c",
         "local_host.h": "c",
         "stdbool.h": "c",
@@ -20,6 +20,7 @@
         "random": "c",
         "assert.h": "c",
         "iterator": "c",
-        "stdlib.h": "c"
+        "stdlib.h": "c",
+        "dynamic_swarm_ranging.h": "c"
     }
 }

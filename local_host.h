@@ -1,10 +1,9 @@
 #ifndef LOCAL_HOST_H
 #define LOCAL_HOST_H
 
-#include "ranging_local_support.h"
-#include "ranging_defconfig.h"
-#include "ranging_struct.h"
-#include "ranging_protocol.h"
+
+#include "local_support.h"
+#include "dynamic_swarm_ranging.h"
 
 
 typedef struct {
@@ -27,6 +26,7 @@ uint16_t string_to_hash(const char *str);
 void localInit(uint16_t address);
 uint64_t xTaskGetTickCount();
 Coordinate_Tuple_t getCurrentLocation();
+void reverseVilocity();
 void modifyLocation();
 void local_sleep(uint64_t milliseconds);
 
