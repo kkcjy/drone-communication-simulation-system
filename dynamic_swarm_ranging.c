@@ -1127,17 +1127,17 @@ Time_t generateMessage(Ranging_Message_t *rangingMessage) {
     rangingMessage->header.msgLength = sizeof(Message_Header_t) + sizeof(Message_Body_Unit_t) * bodyUnitCount;
 
     // should be called in rangingTxCallback(for test here)
-    Timestamp_Tuple_t curTimestamp;
-    curTimestamp.seqNumber = rangingTableSet->localSeqNumber;
-    curTimestamp.timestamp.full = xTaskGetTickCount();
+    // Timestamp_Tuple_t curTimestamp;
+    // curTimestamp.seqNumber = rangingTableSet->localSeqNumber;
+    // curTimestamp.timestamp.full = xTaskGetTickCount();
 
-    #ifdef COORDINATE_SEND_ENABLE
-        modifyLocation();
-        Coordinate_Tuple_t curCoordinate = getCurrentLocation();
-        updateSendList(&rangingTableSet->sendList, curTimestamp, curCoordinate);
-    #else
-        updateSendList(&rangingTableSet->sendList, curTimestamp);
-    #endif
+    // #ifdef COORDINATE_SEND_ENABLE
+    //     modifyLocation();
+    //     Coordinate_Tuple_t curCoordinate = getCurrentLocation();
+    //     updateSendList(&rangingTableSet->sendList, curTimestamp, curCoordinate);
+    // #else
+    //     updateSendList(&rangingTableSet->sendList, curTimestamp);
+    // #endif
 
     // clear expired rangingTable
     if(rangingTableSet->localSeqNumber % CHECK_PERIOD == 0) {
@@ -1250,6 +1250,12 @@ void processMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWithAd
     }
     else {
         DEBUG_PRINT("[CalculatePTof]: CalculatePTof failed\n");
+    }
+    if(distanceCalculate != NULL_DIS) {
+        DEBUG_PRINT("[%d-%d]: ModifiedD = %f, time = %lld\n", MY_UWB_ADDRESS - ADDRESS_BASE, neighborAddress - ADDRESS_BASE, distanceCalculate, rangingMessageWithAdditionalInfo->timestamp.full);
+    }
+    else {
+        DEBUG_PRINT("Warning: No valid Current distance calculated\n");
     }
 
     rangingTableSet->rangingTable[neighborIndex].expirationSign = false;

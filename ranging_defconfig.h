@@ -36,6 +36,5 @@
 #define         UWB_MAX_TIMESTAMP           1099511627776
 #define         VELOCITY                    0.4691763978616
 #define         CONVERGENCE_THRESHOLD       0.989
-#define         INIT_CALCULATION_ROUNDS     4
 
 #endif

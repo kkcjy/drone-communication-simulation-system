@@ -29,6 +29,7 @@ typedef 		uint16_t 					UWB_Address_t;
 typedef 		long 						BaseType_t;
 typedef 		pthread_mutex_t 			*SemaphoreHandle_t;
 typedef struct 	itimerval 					TimerHandle_t;
+#define         ADDRESS_BASE                34697
 
 
 // MODE_ENABLE
