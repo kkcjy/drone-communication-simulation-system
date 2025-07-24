@@ -16,8 +16,8 @@ dwTime_t RxTimestamp;                           // store timestamp from broadcas
 void send_to_center(int center_socket, const char* node_id, const Ranging_Message_t* ranging_msg) {
     NodeMessage msg;
 
-    if(sizeof(Ranging_Message_t) > MESSAGE_SIZE) {
-        printf("Warning: %ld > %ld, Ranging_Message_t too large!\n", sizeof(Ranging_Message_t), MESSAGE_SIZE);
+    if(sizeof(Ranging_Message_t) > DATA_SIZE) {
+        printf("Warning: %ld > %ld, Ranging_Message_t too large!\n", sizeof(Ranging_Message_t), DATA_SIZE);
     }
 
     snprintf(msg.sender_id, sizeof(msg.sender_id), "%s", node_id);  
@@ -59,7 +59,7 @@ void *receive_from_center(void *arg) {
                     StatusType status = line_msg->status;
                     // sender -> ready to send
                     if(status == SENDER) {
-                        QueueTaskTx(&queueTaskLock, MESSAGE_SIZE, send_to_center, center_socket, local_drone_id);
+                        QueueTaskTx(&queueTaskLock, DATA_SIZE, send_to_center, center_socket, local_drone_id);
 
                         TxTimestamp = line_msg->timeStamp;
                         Timestamp_Tuple_t curTimestamp;

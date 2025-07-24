@@ -21,6 +21,7 @@
         "assert.h": "c",
         "iterator": "c",
         "stdlib.h": "c",
-        "dynamic_swarm_ranging.h": "c"
+        "dynamic_swarm_ranging.h": "c",
+        "pthread.h": "c"
     }
 }

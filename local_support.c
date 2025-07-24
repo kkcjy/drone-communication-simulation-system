@@ -11,7 +11,7 @@ void DEBUG_PRINT(const char *format, ...) {
     va_end(args);
     
     // print to file
-    FILE *log_file = first_call ? fopen("data/dataLog.txt", "w") : fopen("data/dataLog.txt", "a");
+    FILE *log_file = first_call ? fopen("data/modified_Log.txt", "w") : fopen("data/modified_Log.txt", "a");
     
     if (log_file != NULL) {
         va_start(args, format);  
@@ -22,7 +22,7 @@ void DEBUG_PRINT(const char *format, ...) {
         first_call = false;
 
     } else {
-        printf("Warning: Could not open dataLog.txt for writing\n");
+        printf("Warning: Could not open modified_Log.txt for writing\n");
     }
 }
 

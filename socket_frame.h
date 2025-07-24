@@ -15,9 +15,9 @@
 
 
 #define     MAX_NODES       3
-#define     BUFFER_SIZE     1024
+#define     MESSAGE_SIZE    1024
 #define     ID_SIZE         20
-#define     MESSAGE_SIZE    BUFFER_SIZE - ID_SIZE - sizeof(size_t)
+#define     DATA_SIZE       MESSAGE_SIZE - ID_SIZE - sizeof(size_t)
 #define     CENTER_PORT     8888
 #define     REJECT_INFO     "REJECT"
 #define     READ_PERIOD     200
@@ -29,21 +29,27 @@ typedef enum {
 } StatusType;
 
 typedef struct {
-    char drone_id[ID_SIZE];
-    StatusType status;
-    dwTime_t timeStamp;
+    char drone_id[ID_SIZE]; // id of drone
+    StatusType status;      // status of drone: TX / RX
+    dwTime_t timeStamp;     // TX / RX timeStamp
 } LineMessage;
 
 typedef struct {
     char sender_id[ID_SIZE];
-    char data[MESSAGE_SIZE];
+    char data[DATA_SIZE];
     size_t data_size;
 } NodeMessage;
 
 typedef struct {
     int socket;
     char node_id[ID_SIZE];
-    int number;
-} NodeInfo;
+    int idx;
+} Node;
+
+typedef struct {
+    Node droneNode[MAX_NODES];
+    int node_count;
+    pthread_mutex_t nodes_mutex;
+} NodeSet;
 
 #endif

@@ -2,15 +2,18 @@
 #include "dynamic_swarm_ranging.h"
 
 
-NodeInfo nodes[MAX_NODES];
-int node_count = 0;
+NodeSet nodeSet;
 long file_pos = 0;  
-pthread_mutex_t nodes_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+
+void nodeSetInit() {
+    nodeSet.node_count = 0;
+    pthread_mutex_init(&nodeSet.nodes_mutex);
+}
 
 int get_index_by_num(int number) {
     for (int i = 0; i < node_count; i++) {
-        if (nodes[i].number == number) {
+        if (droneNode[i].number == number) {
             return i;
         }
     }
@@ -20,7 +23,7 @@ int get_index_by_num(int number) {
 void broadcast_to_nodes(NodeMessage *msg) {
     pthread_mutex_lock(&nodes_mutex);
     for (int i = 0; i < node_count; i++) {
-        if (send(nodes[i].socket, msg, sizeof(NodeMessage), 0) < 0) {
+        if (send(droneNode[i].socket, msg, sizeof(NodeMessage), 0) < 0) {
             perror("Broadcast failed");
         }
     }
@@ -41,14 +44,13 @@ void *handle_node_connection(void *arg) {
 
     pthread_mutex_lock(&nodes_mutex);
     if (node_count < MAX_NODES) {
-        nodes[node_count].socket = node_socket;
-        strncpy(nodes[node_count].node_id, node_id, sizeof(nodes[node_count].node_id));
-        nodes[node_count].number = node_count;
-        node_count++;
+        droneNode[node_count].socket = node_socket;
+        strncpy(droneNode[node_count].node_id, node_id, sizeof(droneNode[node_count].node_id));
+        droneNode[node_count].number = node_count;
         printf("Node %s connected\n", node_id);
     }
     else {
-        printf("Max nodes reached (%d), rejecting %s\n", MAX_NODES, node_id);
+        printf("Max droneNode reached (%d), rejecting %s\n", MAX_NODES, node_id);
         NodeMessage reject_msg;
         strcpy(reject_msg.data, REJECT_INFO);
         reject_msg.data_size = strlen(reject_msg.data);
@@ -71,9 +73,9 @@ void *handle_node_connection(void *arg) {
 
     pthread_mutex_lock(&nodes_mutex);
     for (int i = 0; i < node_count; i++) {
-        if (nodes[i].socket == node_socket) {
-            printf("Node %s disconnected\n", nodes[i].node_id);
-            nodes[i] = nodes[node_count - 1];
+        if (droneNode[i].socket == node_socket) {
+            printf("Node %s disconnected\n", droneNode[i].node_id);
+            droneNode[i] = droneNode[node_count - 1];
             node_count--;
             break;
         }
@@ -119,12 +121,12 @@ void *broadcast_flight_Log(void *arg) {
                     if (idx < 0) {
                         continue;
                     }
-                    snprintf(line_msg.drone_id, ID_SIZE, "%s", nodes[idx].node_id);
+                    snprintf(line_msg.drone_id, ID_SIZE, "%s", droneNode[idx].node_id);
                     line_msg.status = (strcmp(status, "TX") == 0) ? SENDER : RECEIVER;
                     memcpy(read_msg.data, &line_msg, sizeof(LineMessage));
                     strncpy(read_msg.sender_id, "CENTER", ID_SIZE);
                     read_msg.data_size = sizeof(LineMessage);
-                    send(nodes[idx].socket, &read_msg, sizeof(read_msg), 0);
+                    send(droneNode[idx].socket, &read_msg, sizeof(read_msg), 0);
 
                     printf("drone_num: %d, drone_id: %s, status: %s\n", drone_num, line_msg.drone_id, status);
                 }
@@ -179,7 +181,6 @@ int main() {
         }
 
         pthread_t thread_id;
-        node_count++;
         if (pthread_create(&thread_id, NULL, handle_node_connection, new_socket)) {
             perror("pthread_create");
             close(*new_socket);
