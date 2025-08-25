@@ -1,258 +1,120 @@
-# DSR Local Test Without Crazyflie Support
+# Drone Simulation System User Guide
 
-## 🌟 Overview
-This project provides a local test environment for modified ranging without the need for Crazyflie hardware support. It consists of a drone simulator and a control center, allowing you to simulate the communication and ranging process between drones. Additionally, there is a Python script for data processing.
+## Overview
+This system simulates drone communication scenarios through a central controller (`center`) and drone nodes (`drone`). It processes sniffer data into a usable format, then coordinates communication between nodes by broadcasting flight logs and forwarding ranging messages. It supports two ranging modes: `dynamic_swarm_ranging` and `swarm_ranging`, which can be configured according to actual needs.
 
-## 📋 Prerequisites
-- **Operating System**: A Unix-like operating system (e.g., Linux, macOS)
-- **Compiler**: GCC compiler for C code compilation
-- **Python**: Python 3 installed for data processing
+## Process Steps
 
-## 🔨 Building the Project
+### 1. Data Processing
+1. Open `data_process.py`
+2. Modify parameters according to your data:
+   - `FILE_NAME`: Name of the sniffer data file (located in `../sniffer/data/` directory)
+   - `DRONE_NUM`: Actual number of drones in the simulation
+   - `INTEGRITY_FILTER`: Whether to perform integrity check
+3. Run the data processing script:
+   ```bash
+   python3 data_process.py
+   ```
+4. The script will:
+   - Read the original CSV from `../sniffer/data/`
+   - Generate a processed CSV in `./data/` with format:
+     ```
+     src_addr,msg_seq,filter,Tx_time,Rx0_addr,Rx0_time,Rx1_addr,Rx1_time,...
+     ```
+   - Output processing statistics (total lines processed and valid records generated)
 
-### Build All Components
-To build both the drone simulator and the control center, run the following command in the project root directory:
-```sh
+### 2. Configuration Parameter Modification
+1. Open `frame.h`
+2. Modify the `NODES_NUM` macro to match `DRONE_NUM` from step 1
+   ```c
+   #define     NODES_NUM   <number of drones>
+   ```
+4. Other key configurable parameters in `frame.h`(No changes are necessary generally):
+   - `CENTER_PORT`: Communication port (default: 8888)
+   - `READ_PERIOD`: Interval between log broadcasts (default: 200ms)
+   - `ADDR_SIZE`: Maximum length of node addresses (default: 20)
+---
+5. Open `support`
+6. Select the appropriate mode based on the protocol: `SWARM_RANGING_MODE` or `DYNAMIC_SWARM_RANGING_MODE`
+
+### 3. Compile the Program
+1. Use `make mode` to check whether the current compilation mode matches the expected one:
+```bash
+make mode
+```
+2. Execute the compilation command in the project root directory:
+```bash
 make
 ```
+3. Two executable files will be generated:
+- `center`: Central controller program
+- `drone`: Drone node simulation program
 
-### Build Specific Components
-- **Build only the drone simulator**:
-```sh
-make drone
-```
-- **Build only the control center**:
-```sh
-make center_control
-```
+### 4. Run the System
+1. **Start the central controller**:
+   ```bash
+   ./center
+   ```
+   - The controller will start on `CENTER_PORT` (default 8888)
+   - It will wait until all `NODES_NUM` drones connect
 
-## 🚀 Running the System
+2. **Start drone nodes** (open a new terminal for each node):
+   ```bash
+   ./drone <drone_address>
+   ```
+   - `<drone_address>`: Unique numeric address for the drone (e.g., 1, 2, etc.), the address must be consistent with the setting on cfclient.
 
-### Start the Control Center
-After building the project, start the control center by running the following command:
-```sh
-./center_control
-```
-The control center will start listening on the specified port (`8888` by default) and wait for drone connections.
+3. **System operation**:
+   - Once all drones connect, the controller starts broadcasting flight logs
+   - Drones receive log data and exchange ranging messages through the controller
+   - The controller forwards ranging messages between all connected drones
 
-### Start the Drone Simulator
-To start the drone simulator, run the following command, replacing `<port>` with the IP address of the control center and `<drone_name>` with a unique identifier for the drone:
-```sh
-./drone <port> <drone_name>
-```
-**Example**:
-```sh
-./drone 127.0.0.1 drone1
-./drone 127.0.0.1 drone2
-```
-You can start multiple drone simulators to simulate a multi - drone environment.
+### 5. Script
+   Two Python scripts are provided for analyzing the results:
+1. **data_process.py**
+   This script reads data collected by the sniffer and organizes it into a format suitable for simulation, saving the results in the simulation/data directory.
 
-### Process Data
-After the simulation is completed, you can use the Python script to process the data. Run the following command:
-```sh
-python3 data_process.py
-```
-This script will generate a plot of the adjusted data and save it as `data.png`.
+2. **evaluation.py**
+   This script integrates the processed SR and DSR data, aligns them with the VICON timestamps, and then evaluates the data.
 
-## 📁 Code Structure
-- **`local_host`**: Initializes the local host, including address, base time, location, and velocity, providing the system’s basic configuration.
-- **`ranging_struct`**: Defines all necessary types and data structures used throughout the project.
-- **`ranging_protocol`**: Core module for ranging, responsible for table initialization, updating, running the ranging algorithm, and handling related logic.
-- **`queue_task`**: Provides a thread-safe locking mechanism for message processing to ensure data consistency in multithreaded environments.
-- **`ranging_local_support`**: Construct an environment and functions suitable for local execution.
-- **`socket_frame`**: Implements the socket communication framework, including message structures and constants, enabling data exchange between the drone simulator and the control center.
-- **`drone`**: Simulates drone behavior, handling message sending, receiving, and processing using the socket framework.
-- **`center_control`**: Manages the control center, including drone connections, message broadcasting, and drone list management, overseeing the entire system.
-- **`data_process`**: Processes and visualizes simulation data by reading files, calculating offsets, and generating plots to help analyze algorithm performance.
+3. **optimize.py**
+   This script reads data from ranging log.csv and adjusts the compensation coefficient appropriately to optimize ranging accuracy, make sure COMPENSATE_ENABLE is closed.
 
-## ⚙️ State Transition
+4. **vicon.py**
+   This script receives rigid body motion data in real-time from the host of the Vicon motion capture system via a network connection. 
 
-### 1. Kind of Message
-- `TX, RX, RX_NO`
+## Key Components
 
-### 2. Simplified version
-```plaintext
-            +------+------+------+------+------+            
-            |      |      |      |      |  S1  |   ----+
-            +------+------+------+------+------+       |   (2) RX(impossible) / (3) RX_NO
-            |      |      |      |      |      |   <---+
-            +------+------+------+------+------+   ----+        
-                                                       |   (1) TX
-            +------+------+------+------+------+   <---+                                +------+------+------+------+------+
-            |      |      |      |      |  S2  |   ----+----------------------------+   |      |      |      |      |  S3  |
-            +------+------+------+------+------+       |   (1) TX       (3) RX_NO   |   +------+------+------+------+------+
-            |      |      |      | [Tf] |      |   <---+----------------------------+   |      |      |      | [Tf] | [Re] |
-            +------+------+------+------+------+   ----+                                +------+------+------+------+------+
-                                                       |   (2) RX
-            +------+------+------+------+------+   <---+
-            |      |      |      | [Rf] |  S3  |
-            +------+------+------+------+------+
-            |      |      |      | [Tf] | [Re] |
-            +------+------+------+------+------+   ----+
-                                                       |   shift
-            +------+------+------+------+------+   <---+         
-            |      |  Rp  |      |      |  S4  |   ----+
-            +------+------+------+------+------+       |   (2) RX(impossible) / (3) RX_NO
-            |      |  Tp  |  Rr  |      |      |   <---+
-            +------+------+------+------+------+   ----+
-                                                       |   (1) TX
-            +------+------+------+------+------+   <---+                                +------+------+------+------+------+
-            |      |  Rp  |      |      |  S5  |   ----+----------------------------+   |      |  Rp  | [Tr] |      |  S6  |
-            +------+------+------+------+------+       |   (1) TX       (3) RX_NO   |   +------+------+------+------+------+
-            |      |  Tp  |  Rr  | [Tf] |      |   <---+----------------------------+   |      |  Tp  |  Rr  | [Tf] | [Re] |
-            +------+------+------+------+------+   ----+                                +------+------+------+------+------+
-                                                       |   (2) RX
-            +------+------+------+------+------+   <---+
-            |      |  Rp  | [Tr] | [Rf] |  S6  |
-            +------+------+------+------+------+
-            |      |  Tp  |  Rr  | [Tf] | [Re] |
-            +------+------+------+------+------+   ----+
-                                                       |   calculate and shift
-            +------+------+------+------+------+   <---+
-            |  Tb  |  Rp  |      |      |  S4  |   ----+
-    +--->   +------+------+------+------+------+       |   (2) RX(impossible) / (3) RX_NO
-    |       |  Rb  |  Tp  |  Rr  |      |      |   <---+
-    |       +------+------+------+------+------+   ----+
-    |                                                  |   (1) TX
-    |       +------+------+------+------+------+   <---+                                +------+------+------+------+------+
-    |       |  Tb  |  Rp  |      |      |  S5  |   ----+----------------------------+   |  Tb  |  Rp  | [Tr] |      |  S6  |
-    |       +------+------+------+------+------+       |   (1) TX       (3) RX_NO   |   +------+------+------+------+------+
-    |       |  Rb  |  Tp  |  Rr  | [Tf] |      |   <---+----------------------------+   |  Rb  |  Tp  |  Rr  | [Tf] | [Re] |
-    |       +------+------+------+------+------+   ----+                                +------+------+------+------+------+
-    |                                                  |   (2) RX
-    |       +------+------+------+------+------+   <---+
-    |       |  Tb  |  Rp  | [Tr] | [Rf] |  S6  |
-    +----   +------+------+------+------+------+
-            |  Rb  |  Tp  |  Rr  | [Tf] | [Re] |
-            +------+------+------+------+------+
-```
-### 2. Full version
-```
-+------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+
-|      |      |      |      | [Tr] | [Rf] |  S1  |            |      |      |      |      |      |      |  S1  |            |      |      |      |      | [Tr] |      |  S1  |
-+------+------+------+------+------+------+------+     Rx     +------+------+------+------+------+------+------+   RX_NO    +------+------+------+------+------+------+------+
-|      |      |      |      |      |      | [Re] |    <==>    |      |      |      |      |      |      |      |    <==>    |      |      |      |      |      |      | [Re] |
-+------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+
-|             |             |                                 |             |             |                                 |             |             |
-+------+------+------+------+                                 +------+------+------+------+                                 +------+------+------+------+
-                                                                                          |
-                                                                                          |  Tx
-                                                                                          |
-+------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+
-|      |      |      |      |      |      |  S2  |            |      |      |      |      |      |      |  S2  |            |      |      |      |      | [Tr] |      |  S2  |
-+------+------+------+------+------+------+------+     Tx     +------+------+------+------+------+------+------+   RX_NO    +------+------+------+------+------+------+------+
-|      |      |      |      |      | [Tf] |      |    <==>    |      |      |      |      |      | [Tf] |      |    <==>    |      |      |      |      |      |  Tf  | [Re] |
-+------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+
-|             |             |                                 |             |             |                                 |             |             |
-+------+------+------+------+                                 +------+------+------+------+                                 +------+------+------+------+
-                                                                                          |
-                                                                                          |  Rx
-                                                                                          |
-                                                              +------+------+------+------+------+------+------+
-                                                              |      |      |      |      | [Tr] | [Rf] |  S3  |
-                                                              +------+------+------+------+------+------+------+
-                                                              |      |      |      |      |      |  Tf  | [Re] |
-                                                              +------+------+------+------+------+------+------+
-                                                              |             |             |
-                                                              +------+------+------+------+
-                                                                                          |
-                                                                                          |  shift
-                                                                                          |
-+------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+
-|      |      |      |  Rp  | [Tr] | [Rf] | S4.1 |            |      |      |      |  Rp  |      |      | S4.1 |            |      |      |      |  Rp  | [Tr] |      | S4.1 |
-+------+------+------+------+------+------+------+     Rx     +------+------+------+------+------+------+------+   RX_NO    +------+------+------+------+------+------+------+
-|      |      |      |  Tp  |  Rr  |      | [Re] |    <==>    |      |      |      |  Tp  |  Rr  |      |      |    <==>    |      |      |      |  Tp  |  Rr  |      | [Re] |
-+------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+
-|             |             |                                 |             |             |                                 |             |             |
-+------+------+------+------+                                 +------+------+------+------+                                 +------+------+------+------+    
-                                                                                          |
-                                                                                          |  Tx
-                                                                                          |
-+------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+
-|      |      |      |  Rp  |      |      | S5.1 |            |      |      |      |  Rp  |      |      | S5.1 |            |      |      |      |  Rp  | [Tr] |      | S5.1 |
-+------+------+------+------+------+------+------+     Tx     +------+------+------+------+------+------+------+   RX_NO    +------+------+------+------+------+------+------+
-|      |      |      |  Tp  |  Rr  | [Tf] |      |    <==>    |      |      |      |  Tp  |  Rr  | [Tf] |      |    <==>    |      |      |      |  Tp  |  Rr  | [Tf] | [Re] |
-+------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+
-|             |             |                                 |             |             |                                 |             |             |
-+------+------+------+------+                                 +------+------+------+------+                                 +------+------+------+------+    
-                                                                                          |
-                                                                                          |  Rx
-                                                                                          |
-                                                              +------+------+------+------+------+------+------+          
-                                                              |      |      |      |  Rp  | [Tr] | [Rf] | S6.1 |         
-                                                              +------+------+------+------+------+------+------+  
-                                                              |      |      |      |  Tp  |  Rr  |  Tf  | [Re] |  
-                                                              +------+------+------+------+------+------+------+         
-                                                              |             |             |                               
-                                                              +------+------+------+------+                             
-                                                                                          |
-                                                                                          |  shift
-                                                                                          |
-+------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+
-|      | ERp  |  Tb  |  Rp  | [Tr] | [Rf] | S4.2 |            |      | ERp  |  Tb  |  Rp  |      |      | S4.2 |            |      | ERp  |  Tb  |  Rp  | [Tr] |      | S4.2 |
-+------+------+------+------+------+------+------+     Rx     +------+------+------+------+------+------+------+   RX_NO    +------+------+------+------+------+------+------+
-|      | ETp  |  Rb  |  Tp  |  Rr  |      | [Re] |    <==>    |      | ETp  |  Rb  |  Tp  |  Rr  |      |      |    <==>    |      | ETp  |  Rb  |  Tp  |  Rr  |      | [Re] |
-+------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+
-|             |    PTof     |                                 |             |    PTof     |                                 |             |    PTof     |
-+------+------+------+------+                                 +------+------+------+------+                                 +------+------+------+------+
-                                                                                          |
-                                                                                          |  Tx
-                                                                                          |
-+------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+
-|      | ERp  |  Tb  |  Rp  |      |      | S5.2 |            |      | ERp  |  Tb  |  Rp  |      |      | S5.2 |            |      | ERp  |  Tb  |  Rp  | [Tr] |      | S5.2 |
-+------+------+------+------+------+------+------+     Tx     +------+------+------+------+------+------+------+   RX_NO    +------+------+------+------+------+------+------+
-|      | ETp  |  Rb  |  Tp  |  Rr  | [Tf] |      |    <==>    |      | ETp  |  Rb  |  Tp  |  Rr  | [Tf] |      |    <==>    |      | ETp  |  Rb  |  Tp  |  Rr  |  Tf  | [Re] |
-+------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+
-|             |    PTof     |                                 |             |    PTof     |                                 |             |    PTof     |
-+------+------+------+------+                                 +------+------+------+------+                                 +------+------+------+------+    
-                                                                                          |
-                                                                                          |  Rx
-                                                                                          |
-                                                              +------+------+------+------+------+------+------+
-                                                              |      | ERp  |  Tb  |  Rp  | [Tr] | [Rf] | S6.2 |
-                                                              +------+------+------+------+------+------+------+
-                                                              |      | ETp  |  Rb  |  Tp  |  Rr  |  Tf  | [Re] |
-                                                              +------+------+------+------+------+------+------+ 
-                                                              |             |    PTof     |                            
-                                                              +------+------+------+------+
-                                                                                          |
-                                                                                          |  shift                  +-------------------------------------------------------------+
-                                                                                          |                         |                                                             |
-+------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+<---+       +------+------+------+------+------+------+------+    |
-| ETb  | ERp  |  Tb  |  Rp  | [Tr] | [Rf] | S4.3 |            | ETb  | ERp  |  Tb  |  Rp  |      |      | S4.3 |            | ETb  | ERp  |  Tb  |  Rp  | [Tr] |      | S4.3 |    |
-+------+------+------+------+------+------+------+     Rx     +------+------+------+------+------+------+------+   RX_NO    +------+------+------+------+------+------+------+    |
-| ERb  | ETp  |  Rb  |  Tp  |  Rr  |      | [Re] |    <==>    | ERb  | ETp  |  Rb  |  Tp  |  Rr  |      |      |    <==>    | ERb  | ETp  |  Rb  |  Tp  |  Rr  |      | [Re] |    |
-+------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+    |
-|    EPTof    |    PTof     |                                 |    EPTof    |    PTof     |                                 |    EPTof    |    PTof     |                         |
-+------+------+------+------+                                 +------+------+------+------+                                 +------+------+------+------+                         |
-                                                                                          |                                                                                       |
-                                                                                          |  Tx                                                                                   |
-                                                                                          |                                                                                       |
-+------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+    |
-| ETb  | ERp  |  Tb  |  Rp  |      |      | S5.3 |            | ETb  | ERp  |  Tb  |  Rp  |      |      | S5.3 |            | ETb  | ERp  |  Tb  |  Rp  | [Tr] |      | S5.3 |    |
-+------+------+------+------+------+------+------+     Tx     +------+------+------+------+------+------+------+   RX_NO    +------+------+------+------+------+------+------+    |
-| ERb  | ETp  |  Rb  |  Tp  |  Rr  | [Tf] |      |    <==>    | ERb  | ETp  |  Rb  |  Tp  |  Rr  | [Tf] |      |    <==>    | ERb  | ETp  |  Rb  |  Tp  |  Rr  |  Tf  | [Re] |    |
-+------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+            +------+------+------+------+------+------+------+    |
-|    EPTof    |    PTof     |                                 |             |    PTof     |                                 |    EPTof    |    PTof     |                         |
-+------+------+------+------+                                 +------+------+------+------+                                 +------+------+------+------+                         |
-                                                                                          |                                                                                       | 
-                                                                                          |  Rx                                                                                   |
-                                                                                          |                                                                                       |
-                                                              +------+------+------+------+------+------+------+                                                                  |
-                                                              | ETb  | ERp  |  Tb  |  Rp  | [Tr] | [Rf] | S6.3 |                                                                  |
-                                                              +------+------+------+------+------+------+------+                                                                  |
-                                                              | ERb  | ETp  |  Rb  |  Tp  |  Rr  |  Tf  | [Re] |                                                                  |
-                                                              +------+------+------+------+------+------+------+                                                                  |
-                                                              |    EPTof    |    PTof     |                                                                                       |
-                                                              +------+------+------+------+                                                                                       |
-                                                                                          |  shift                                                                                |
-                                                                                          +---------------------------------------------------------------------------------------+ 
-```
+### Center Program
+- **Node Management**: Tracks connected drones using a `Drone_Node_Set_t` structure
+- **Flight Log Broadcasting**: Reads processed CSV data and sends time-stamped messages to corresponding drones
+- **Message Routing**: Forwards ranging messages between drones using a broadcast mechanism
+- **Concurrency**: Uses pthread mutexes for thread-safe access to shared data and handles each drone connection in a separate thread
 
-## ⚙️ Configuration
-The project can be configured through preprocessor directives in the source code. For example, you can enable or disable features such as dynamic ranging frequency, packet loss simulation, and position sending by defining or undefining the corresponding macros in the source files.
+### Drone Program
+- **Communication**: Maintains a connection to the central controller
+- **Message Handling**: 
+  - Receives flight log data (Tx/Rx timestamps)
+  - Processes ranging messages using `processDSRMessage()`
+  - Generates responses using `generateDSRMessage()`
+- **Callbacks**: Uses `TxCallBack()` and `RxCallBack()` to handle message processing
 
-## 🛠️ Troubleshooting
-- **Compilation errors**: Make sure you have the necessary dependencies installed and that your compiler is configured correctly.
-- **Connection issues**: Check that the IP address and port specified when starting the drone simulator match the settings of the control center.
-- **Data processing errors**: Ensure that the input data format is correct and that Python 3 and the required libraries (e.g., `matplotlib, numpy`) are installed.
+### Data Flow
+1. Sniffer data → `data_process.py` → Processed CSV
+2. Controller reads CSV → Sends Tx/Rx timestamps to respective drones
+3. Drones generate ranging messages → Sent to controller
+4. Controller broadcasts ranging messages to all drones
+5. Drones process received ranging messages with timestamps
+
+## Notes
+- Ensure that all drone addresses are set to values other than 0
+- Ensure COMPENSATE_ENABLE is closed while using optimize.py
+- Ensure the original sniffer data file exists in `../sniffer/data/` before processing
+- Drone addresses must be unique and match those in the processed data file
+- Use `Ctrl+C` to terminate any running component
+
+## Troubleshooting
+- **Connection Issues**: Verify `CENTER_PORT` is not blocked and controller is running before starting drones
+- **Data Mismatch**: Check that `NODES_NUM` matches `drone_num` and addresses match data file
+- **Compilation Errors**: Ensure all dependencies are installed
+- **Timeout Errors**: Verify controller is broadcasting data and network connectivity is working

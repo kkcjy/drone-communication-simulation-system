@@ -22,6 +22,8 @@
         "iterator": "c",
         "stdlib.h": "c",
         "dynamic_swarm_ranging.h": "c",
-        "pthread.h": "c"
+        "pthread.h": "c",
+        "support.h": "c",
+        "string.h": "c"
     }
 }
