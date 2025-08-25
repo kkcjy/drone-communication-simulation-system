@@ -24,6 +24,8 @@
         "dynamic_swarm_ranging.h": "c",
         "pthread.h": "c",
         "support.h": "c",
-        "string.h": "c"
+        "string.h": "c",
+        "adhocuwb_dynamic_swarm_ranging.h": "c",
+        "adhocuwb_swarm_ranging.h": "c"
     }
 }
