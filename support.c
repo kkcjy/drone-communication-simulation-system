@@ -18,11 +18,11 @@ void DEBUG_PRINT(const char *format, ...) {
     va_start(args, format);
     vprintf(format, args);
     va_end(args);
-    
+
     // print to file
-    #if defined(SWARM_RANGING_MODE)
+    #if defined(CLASSIC_RANGING_MODE)
     FILE *log_file = first_call ? fopen("./data/swarm_ranging.txt", "w") : fopen("./data/swarm_ranging.txt", "a");
-    #elif defined(DYNAMIC_SWARM_RANGING_MODE)
+    #elif defined(DYNAMIC_RANGING_MODE)
     FILE *log_file = first_call ? fopen("./data/dynamic_swarm_ranging.txt", "w") : fopen("./data/dynamic_swarm_ranging.txt", "a");
     #endif
 
@@ -31,9 +31,7 @@ void DEBUG_PRINT(const char *format, ...) {
         vfprintf(log_file, format, args);
         va_end(args);
         fclose(log_file);
-        
         first_call = false;
-
     } 
     else {
         printf("Warning: Could not open modified_Log.txt for writing\n");

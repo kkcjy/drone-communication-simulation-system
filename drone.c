@@ -3,9 +3,9 @@
 
 
 const char* localAddress;
-#if defined(SWARM_RANGING_MODE)
+#if defined(CLASSIC_RANGING_MODE)
 extern Ranging_Table_Set_t rangingTableSet;
-#elif defined(DYNAMIC_SWARM_RANGING_MODE)
+#elif defined(DYNAMIC_RANGING_MODE)
 extern Ranging_Table_Set_t *rangingTableSet;
 #endif
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;      // mutex for synchronizing access to the rangingTableSet
@@ -32,7 +32,7 @@ void send_to_center(int center_socket, const char* address, const Ranging_Messag
 }
 
 void TxCallBack(int center_socket, dwTime_t timestamp) {
-    #if defined(SWARM_RANGING_MODE)
+    #if defined(CLASSIC_RANGING_MODE)
         Ranging_Message_t ranging_msg;
 
         generateRangingMessage(&ranging_msg);
@@ -47,7 +47,7 @@ void TxCallBack(int center_socket, dwTime_t timestamp) {
         // printf("Txcall, Txtimesatamp = %lu\n", timestamp.full);
 
         // reset of TxTimestamp in other place
-    #elif defined(DYNAMIC_SWARM_RANGING_MODE)
+    #elif defined(DYNAMIC_RANGING_MODE)
         Ranging_Message_t ranging_msg;
 
         generateDSRMessage(&ranging_msg);
@@ -72,7 +72,7 @@ void RxCallBack(Ranging_Message_t *rangingMessage, dwTime_t timestamp) {
         return;
     }
 
-    #if defined(SWARM_RANGING_MODE)
+    #if defined(CLASSIC_RANGING_MODE)
         Ranging_Message_With_Timestamp_t rangingMessageWithTimestamp;
         rangingMessageWithTimestamp.rangingMessage = *rangingMessage;
         rangingMessageWithTimestamp.rxTime = timestamp;
@@ -82,7 +82,7 @@ void RxCallBack(Ranging_Message_t *rangingMessage, dwTime_t timestamp) {
         // printf("Rxcall, Rx timestamp = %lu\n", timestamp.full);
 
         // reset of RxTimestamp in other place
-    #elif defined(DYNAMIC_SWARM_RANGING_MODE)
+    #elif defined(DYNAMIC_RANGING_MODE)
         Ranging_Message_With_Additional_Info_t rangingMessageWithAdditionalInfo;
         rangingMessageWithAdditionalInfo.rangingMessage = *rangingMessage;
         rangingMessageWithAdditionalInfo.timestamp = timestamp;
@@ -159,9 +159,9 @@ int main(int argc, char *argv[]) {
     TxTimestamp.full = 0;
     RxTimestamp.full = 0;
 
-    #if defined(SWARM_RANGING_MODE)
+    #if defined(CLASSIC_RANGING_MODE)
         rangingTableSetInit(&rangingTableSet);
-    #elif defined(DYNAMIC_SWARM_RANGING_MODE)
+    #elif defined(DYNAMIC_RANGING_MODE)
         rangingTableSetInit();
     #endif
 

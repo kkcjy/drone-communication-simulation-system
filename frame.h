@@ -14,16 +14,12 @@
 #include "support.h"
 
 
-#if defined(SWARM_RANGING_MODE)
+#if defined(CLASSIC_RANGING_MODE)
 #include "adhocuwb_swarm_ranging.h"
-#elif defined(DYNAMIC_SWARM_RANGING_MODE)
+#elif defined(DYNAMIC_RANGING_MODE)
 #include "adhocuwb_dynamic_swarm_ranging.h"
 #endif
 
-
-#define     NODES_NUM               2       // the total number of drones in the system
-#define     PACKET_LOSS             0       // packet loss rate for simulating communication link quality
-#define     RANGING_PERIOD_RATE     1       // rate multiplier for ranging data transmission period
 
 #define     ADDR_SIZE               20
 #define     CENTER_ADDRESS          "CENTER"

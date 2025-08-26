@@ -6,34 +6,58 @@
 #include <pthread.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "dwTypes.h"
 
 
-#define SWARM_RANGING_MODE
-// #define DYNAMIC_SWARM_RANGING_MODE
+/* simulation mode for choosing */
+// #define IEEE_802_15_4Z
+// #define SWARM_RANGING_V1
+#define SWARM_RANGING_V2
+// #define DYNAMIC_RANGING_MODE
+
+#define     NODES_NUM               2       // the total number of drones in the system
+#define     PACKET_LOSS             0       // packet loss rate for simulating communication link quality
+#define     RANGING_PERIOD_RATE     1       // rate multiplier for ranging data transmission period
+
+#if defined(IEEE_802_15_4Z) || defined(SWARM_RANGING_V1) || defined(SWARM_RANGING_V2)
+#define CLASSIC_RANGING_MODE
+#endif
 
 
 typedef         uint16_t                    UWB_Address_t;
 typedef         uint32_t                    TickType_t;
 typedef         long                        BaseType_t;
 #define         ASSERT                      assert
-#define         DWT_TIME_UNITS              (1.0/499.2e6/128.0) 
-#define         M2T(X)                      ((unsigned int)(X))
-#define         pdTRUE                      ((BaseType_t)1)
+#define         DWT_TIME_UNITS              (1.0/499.2e6/128.0)
 #define         portTickType                TickType_t
 #define         portMAX_DELAY               (TickType_t)0xffffffffUL
+#define         pdTRUE                      ((BaseType_t)1)
 #define         UWB_DEST_EMPTY              65534
 #define         UWB_FRAME_LEN_MAX           256
+#define         UWB_MAX_TIMESTAMP           1099511627776
 #define         UWB_PACKET_SIZE_MAX         UWB_FRAME_LEN_MAX
 #define         UWB_PAYLOAD_SIZE_MAX        (UWB_PACKET_SIZE_MAX - sizeof(UWB_Packet_Header_t))
-#define         UWB_MAX_TIMESTAMP           1099511627776
 typedef         pthread_mutex_t             *SemaphoreHandle_t;
 typedef         portTickType                Time_t;
+#define         M2T(X)                      ((unsigned int)(X))
 
+
+typedef union dwTime_u {
+	uint8_t raw[5];
+	uint64_t full;
+	struct {
+		uint32_t low32;
+		uint8_t high8;
+	} __attribute__((packed));
+	struct {
+		uint8_t low8;
+		uint32_t high32;
+	} __attribute__((packed));
+} dwTime_t;
 
 typedef enum {
     UWB_REVERSED_MESSAGE = 0,

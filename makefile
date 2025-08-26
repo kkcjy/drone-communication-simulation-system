@@ -16,32 +16,56 @@ DRONE_OUT = drone
 
 all: $(CENTER_OUT) $(DRONE_OUT)
 
-SWARM_MODE_DEFINED = $(shell grep -v '^[[:space:]]*//' $(SUPPORT_SRC) | grep -v '^[[:space:]]*$$' | grep -q '^[[:space:]]*#define[[:space:]]*SWARM_RANGING_MODE[[:space:]]*$$' && echo 1)
-DYNAMIC_MODE_DEFINED = $(shell grep -v '^[[:space:]]*//' $(SUPPORT_SRC) | grep -v '^[[:space:]]*$$' | grep -q '^[[:space:]]*#define[[:space:]]*DYNAMIC_SWARM_RANGING_MODE[[:space:]]*$$' && echo 1)
+IEEE_MODE_DEFINED   = $(shell grep -v '^[[:space:]]*//' $(SUPPORT_SRC) | grep -q '^[[:space:]]*#define[[:space:]]*IEEE_802_15_4Z[[:space:]]*$$' && echo 1 || echo 0)
+SWARM_V1_MODE_DEFINED = $(shell grep -v '^[[:space:]]*//' $(SUPPORT_SRC) | grep -q '^[[:space:]]*#define[[:space:]]*SWARM_RANGING_V1[[:space:]]*$$' && echo 1 || echo 0)
+SWARM_V2_MODE_DEFINED = $(shell grep -v '^[[:space:]]*//' $(SUPPORT_SRC) | grep -q '^[[:space:]]*#define[[:space:]]*SWARM_RANGING_V2[[:space:]]*$$' && echo 1 || echo 0)
+DYNAMIC_MODE_DEFINED  = $(shell grep -v '^[[:space:]]*//' $(SUPPORT_SRC) | grep -q '^[[:space:]]*#define[[:space:]]*DYNAMIC_RANGING_MODE[[:space:]]*$$' && echo 1 || echo 0)
 
-ifeq ($(SWARM_MODE_DEFINED)$(DYNAMIC_MODE_DEFINED),11)
-$(error "Error: Both modes are defined! Please define only one mode")
-else ifneq ($(SWARM_MODE_DEFINED),)
+MODE_COUNT = $(shell expr $(IEEE_MODE_DEFINED) + $(SWARM_V1_MODE_DEFINED) + $(SWARM_V2_MODE_DEFINED) + $(DYNAMIC_MODE_DEFINED))
+
+ifeq ($(MODE_COUNT),0)
+$(error "Error: No mode defined in $(SUPPORT_SRC)! Please define one mode")
+else ifneq ($(MODE_COUNT),1)
+$(error "Error: Multiple modes defined! Please define only one mode")
+endif
+
+ifeq ($(IEEE_MODE_DEFINED),1)
 $(CENTER_OUT): $(CENTER_SRC) $(FRAME_SRC)
 	$(CC) $(SR_CFLAGS) -o $@ $(CENTER_SRC) -lm
-
 $(DRONE_OUT): $(DRONE_SRC) $(FRAME_SRC) $(SR_SRC)
 	$(CC) $(SR_CFLAGS) -o $@ $(DRONE_SRC) $(SR_SRC) -lm
-else ifneq ($(DYNAMIC_MODE_DEFINED),)
+endif
+
+ifeq ($(SWARM_V1_MODE_DEFINED),1)
+$(CENTER_OUT): $(CENTER_SRC) $(FRAME_SRC)
+	$(CC) $(SR_CFLAGS) -o $@ $(CENTER_SRC) -lm
+$(DRONE_OUT): $(DRONE_SRC) $(FRAME_SRC) $(SR_SRC)
+	$(CC) $(SR_CFLAGS) -o $@ $(DRONE_SRC) $(SR_SRC) -lm
+endif
+
+ifeq ($(SWARM_V2_MODE_DEFINED),1)
+$(CENTER_OUT): $(CENTER_SRC) $(FRAME_SRC)
+	$(CC) $(SR_CFLAGS) -o $@ $(CENTER_SRC) -lm
+$(DRONE_OUT): $(DRONE_SRC) $(FRAME_SRC) $(SR_SRC)
+	$(CC) $(SR_CFLAGS) -o $@ $(DRONE_SRC) $(SR_SRC) -lm
+endif
+
+ifeq ($(DYNAMIC_MODE_DEFINED),1)
 $(CENTER_OUT): $(CENTER_SRC) $(FRAME_SRC)
 	$(CC) $(DSR_CFLAGS) -o $@ $(CENTER_SRC) -lm
-
 $(DRONE_OUT): $(DRONE_SRC) $(FRAME_SRC) $(DSR_SRC)
 	$(CC) $(DSR_CFLAGS) -o $@ $(DRONE_SRC) $(DSR_SRC) -lm
-else
-$(error "Error: No valid mode defined in $(FRAME_SRC)! Please define either DYNAMIC_SWARM_RANGING_MODE or SWARM_RANGING_MODE (not commented)")
 endif
 
 mode:
-ifeq ($(SWARM_MODE_DEFINED),1)
-	@echo "Current mode: SWARM_RANGING_MODE"
+ifeq ($(IEEE_MODE_DEFINED),1)
+	@echo "Current mode: IEEE_802_15_4Z"
+else ifeq ($(SWARM_V1_MODE_DEFINED),1)
+	@echo "Current mode: SWARM_RANGING_V1"
+else ifeq ($(SWARM_V2_MODE_DEFINED),1)
+	@echo "Current mode: SWARM_RANGING_V2"
 else ifeq ($(DYNAMIC_MODE_DEFINED),1)
-	@echo "Current mode: DYNAMIC_SWARM_RANGING_MODE"
+	@echo "Current mode: DYNAMIC_RANGING_MODE"
 endif
 
 clean:
