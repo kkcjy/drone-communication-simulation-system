@@ -15,8 +15,8 @@
 
 /* simulation mode for choosing */
 // #define IEEE_802_15_4Z
-// #define SWARM_RANGING_V1
-#define SWARM_RANGING_V2
+#define SWARM_RANGING_V1
+// #define SWARM_RANGING_V2
 // #define DYNAMIC_RANGING_MODE
 
 #define     NODES_NUM               2       // the total number of drones in the system

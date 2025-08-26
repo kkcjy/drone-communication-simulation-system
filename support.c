@@ -20,10 +20,14 @@ void DEBUG_PRINT(const char *format, ...) {
     va_end(args);
 
     // print to file
-    #if defined(CLASSIC_RANGING_MODE)
-    FILE *log_file = first_call ? fopen("./data/swarm_ranging.txt", "w") : fopen("./data/swarm_ranging.txt", "a");
+    #if defined(IEEE_802_15_4Z)
+    FILE *log_file = first_call ? fopen("./data/log/802_15_4z.txt", "w") : fopen("./data/log/802_15_4z.txt", "a");
+    #elif defined(SWARM_RANGING_V1)
+    FILE *log_file = first_call ? fopen("./data/log/swarm_v1.txt", "w") : fopen("./data/log/swarm_v1.txt", "a");
+    #elif defined(SWARM_RANGING_V2)
+    FILE *log_file = first_call ? fopen("./data/log/swarm_v2.txt", "w") : fopen("./data/log/swarm_v2.txt", "a");
     #elif defined(DYNAMIC_RANGING_MODE)
-    FILE *log_file = first_call ? fopen("./data/dynamic_swarm_ranging.txt", "w") : fopen("./data/dynamic_swarm_ranging.txt", "a");
+    FILE *log_file = first_call ? fopen("./data/log/dynamic.txt", "w") : fopen("./data/log/dynamic.txt", "a");
     #endif
 
     if (log_file != NULL) {

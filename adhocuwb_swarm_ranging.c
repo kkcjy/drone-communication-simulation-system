@@ -32,6 +32,14 @@
     #define DEBUG_PRINT
 #endif
 
+#if defined(IEEE_802_15_4Z)
+#define     RANGING_MODE            "IEEE"
+#elif defined(SWARM_RANGING_V1)
+#define     RANGING_MODE            "SR_V1"
+#elif defined(SWARM_RANGING_V2)
+#define     RANGING_MODE            "SR_V2"
+#endif
+
 #define     MIN(a, b)               ((a) < (b) ? (a) : (b))
 #define     MAX(a, b)               ((a) > (b) ? (a) : (b))
 #define     ABS(a)                  ((a) > 0 ? (a) : -(a))
@@ -1181,7 +1189,7 @@ static void S1_Tf(Ranging_Table_t *rangingTable) {
 static void S1_RX_NO_Rf(Ranging_Table_t *rangingTable) {
     RANGING_TABLE_STATE prevState = rangingTable->state;
 
-    DEBUG_PRINT("[local_%u <- neighbor_%u]: SR dist = %d, time = %llu\n", MY_UWB_ADDRESS, rangingTable->neighborAddress, -1, rangingTable->Re.timestamp.full % UWB_MAX_TIMESTAMP);
+    DEBUG_PRINT("[local_%u <- neighbor_%u]: %s dist = %d, time = %llu\n", MY_UWB_ADDRESS, rangingTable->neighborAddress, RANGING_MODE, -1, rangingTable->Re.timestamp.full % UWB_MAX_TIMESTAMP);
 
     rangingTable->state = RANGING_STATE_S1;
 
@@ -1193,7 +1201,7 @@ static void S1_RX_NO_Rf(Ranging_Table_t *rangingTable) {
 static void S1_RX_Rf(Ranging_Table_t *rangingTable) {
     RANGING_TABLE_STATE prevState = rangingTable->state;
 
-    DEBUG_PRINT("[local_%u <- neighbor_%u]: SR dist = %d, time = %llu\n", MY_UWB_ADDRESS, rangingTable->neighborAddress, -1, rangingTable->Re.timestamp.full % UWB_MAX_TIMESTAMP);
+    DEBUG_PRINT("[local_%u <- neighbor_%u]: %s dist = %d, time = %llu\n", MY_UWB_ADDRESS, rangingTable->neighborAddress, RANGING_MODE, -1, rangingTable->Re.timestamp.full % UWB_MAX_TIMESTAMP);
 
     rangingTable->state = RANGING_STATE_S1;
 
@@ -1215,7 +1223,7 @@ static void S2_Tf(Ranging_Table_t *rangingTable) {
 static void S2_RX_NO_Rf(Ranging_Table_t *rangingTable) {
     RANGING_TABLE_STATE prevState = rangingTable->state;
 
-    DEBUG_PRINT("[_%u <- neighbor_%u]: SR dist = %d, time = %llu\n", MY_UWB_ADDRESS, rangingTable->neighborAddress, -1, rangingTable->Re.timestamp.full % UWB_MAX_TIMESTAMP);
+    DEBUG_PRINT("[local_%u <- neighbor_%u]: %s dist = %d, time = %llu\n", MY_UWB_ADDRESS, rangingTable->neighborAddress, RANGING_MODE, -1, rangingTable->Re.timestamp.full % UWB_MAX_TIMESTAMP);
 
     rangingTable->state = RANGING_STATE_S2;
 
@@ -1233,7 +1241,7 @@ static void S2_RX_Rf(Ranging_Table_t *rangingTable) {
         DEBUG_PRINT("Cannot found corresponding Tf in Tf buffer, the ranging frequency may be too high or Tf buffer is in a small size.");
     }
 
-    DEBUG_PRINT("[local_%u <- neighbor_%u]: SR dist = %d, time = %llu\n", MY_UWB_ADDRESS, rangingTable->neighborAddress, -1, rangingTable->Re.timestamp.full % UWB_MAX_TIMESTAMP);
+    DEBUG_PRINT("[local_%u <- neighbor_%u]: %s dist = %d, time = %llu\n", MY_UWB_ADDRESS, rangingTable->neighborAddress, RANGING_MODE, -1, rangingTable->Re.timestamp.full % UWB_MAX_TIMESTAMP);
 
     /* Shift ranging table
     * Rp <- Rf
@@ -1266,14 +1274,14 @@ static void S3_Tf(Ranging_Table_t *rangingTable) {
 
 static void S3_RX_NO_Rf(Ranging_Table_t *rangingTable) {
     #if defined(IEEE_802_15_4Z) || defined(SWARM_RANGING_V1)
-        DEBUG_PRINT("[local_%u <- neighbor_%u]: SR dist = %d, time = %llu\n", MY_UWB_ADDRESS, rangingTable->neighborAddress, -1, rangingTable->Re.timestamp.full % UWB_MAX_TIMESTAMP);
+        DEBUG_PRINT("[local_%u <- neighbor_%u]: %s dist = %d, time = %llu\n", MY_UWB_ADDRESS, rangingTable->neighborAddress, RANGING_MODE, -1, rangingTable->Re.timestamp.full % UWB_MAX_TIMESTAMP);
     #elif defined(SWARM_RANGING_V2)
         Ranging_Table_Tr_Rr_Candidate_t Tr_Rr_Candidate = rangingTableBufferGetLatest(&rangingTable->TrRrBuffer);
         int16_t distance = computeDistance2(rangingTable->TxRxHistory.Tx, rangingTable->TxRxHistory.Rx,
                                             rangingTable->Tp, rangingTable->Rp,
                                             Tr_Rr_Candidate.Tr, Tr_Rr_Candidate.Rr,rangingTable);
 
-        DEBUG_PRINT("[local_%u <- neighbor_%u]: SR dist = %d, time = %llu\n", MY_UWB_ADDRESS, rangingTable->neighborAddress, distance, rangingTable->Re.timestamp.full % UWB_MAX_TIMESTAMP);    
+        DEBUG_PRINT("[local_%u <- neighbor_%u]: %s dist = %d, time = %llu\n", MY_UWB_ADDRESS, rangingTable->neighborAddress, RANGING_MODE, distance, rangingTable->Re.timestamp.full % UWB_MAX_TIMESTAMP);    
 
         if (distance > 0) {
             rangingTable->distance = distance;
@@ -1304,14 +1312,14 @@ static void S3_RX_NO_Rf(Ranging_Table_t *rangingTable) {
 
 static void S3_RX_Rf(Ranging_Table_t *rangingTable) {
     #if defined(IEEE_802_15_4Z) || defined(SWARM_RANGING_V1)
-        DEBUG_PRINT("[local_%u <- neighbor_%u]: SR dist = %d, time = %llu\n", MY_UWB_ADDRESS, rangingTable->neighborAddress, -1, rangingTable->Re.timestamp.full % UWB_MAX_TIMESTAMP);
+        DEBUG_PRINT("[local_%u <- neighbor_%u]: %s dist = %d, time = %llu\n", MY_UWB_ADDRESS, rangingTable->neighborAddress, RANGING_MODE, -1, rangingTable->Re.timestamp.full % UWB_MAX_TIMESTAMP);
     #elif defined(SWARM_RANGING_V2)
         Ranging_Table_Tr_Rr_Candidate_t Tr_Rr_Candidate = rangingTableBufferGetLatest(&rangingTable->TrRrBuffer);
         int16_t distance = computeDistance2(rangingTable->TxRxHistory.Tx, rangingTable->TxRxHistory.Rx,
                                             rangingTable->Tp, rangingTable->Rp,
                                             Tr_Rr_Candidate.Tr, Tr_Rr_Candidate.Rr,rangingTable);
 
-        DEBUG_PRINT("[local_%u <- neighbor_%u]: SR dist = %d, time = %llu\n", MY_UWB_ADDRESS, rangingTable->neighborAddress, distance, rangingTable->Re.timestamp.full % UWB_MAX_TIMESTAMP);
+        DEBUG_PRINT("[local_%u <- neighbor_%u]: %s dist = %d, time = %llu\n", MY_UWB_ADDRESS, rangingTable->neighborAddress, RANGING_MODE, distance, rangingTable->Re.timestamp.full % UWB_MAX_TIMESTAMP);
     
         if (distance > 0) {
             rangingTable->distance = distance;
@@ -1349,7 +1357,7 @@ static void S4_Tf(Ranging_Table_t *rangingTable) {
 
 static void S4_RX_NO_Rf(Ranging_Table_t *rangingTable) {
     #if defined(IEEE_802_15_4Z) || defined(SWARM_RANGING_V1)
-        DEBUG_PRINT("[local_%u <- neighbor_%u]: SR dist = %d, time = %llu\n", MY_UWB_ADDRESS, rangingTable->neighborAddress, -1, rangingTable->Re.timestamp.full % UWB_MAX_TIMESTAMP);
+        DEBUG_PRINT("[local_%u <- neighbor_%u]: %s dist = %d, time = %llu\n", MY_UWB_ADDRESS, rangingTable->neighborAddress, RANGING_MODE, -1, rangingTable->Re.timestamp.full % UWB_MAX_TIMESTAMP);
     #elif defined(SWARM_RANGING_V2)
         /*use history tx,rx to compute distance*/
         Ranging_Table_Tr_Rr_Candidate_t Tr_Rr_Candidate = rangingTableBufferGetLatest(&rangingTable->TrRrBuffer);
@@ -1357,7 +1365,7 @@ static void S4_RX_NO_Rf(Ranging_Table_t *rangingTable) {
                                             rangingTable->Tp, rangingTable->Rp,
                                             Tr_Rr_Candidate.Tr, Tr_Rr_Candidate.Rr,rangingTable);
 
-        DEBUG_PRINT("[local_%u <- neighbor_%u]: SR dist = %d, time = %llu\n", MY_UWB_ADDRESS, rangingTable->neighborAddress, distance, rangingTable->Re.timestamp.full % UWB_MAX_TIMESTAMP);
+        DEBUG_PRINT("[local_%u <- neighbor_%u]: %s dist = %d, time = %llu\n", MY_UWB_ADDRESS, rangingTable->neighborAddress, RANGING_MODE, distance, rangingTable->Re.timestamp.full % UWB_MAX_TIMESTAMP);
     
         if (distance > 0) {
             rangingTable->distance = distance;
@@ -1403,7 +1411,7 @@ static void S4_RX_Rf(Ranging_Table_t *rangingTable) {
                                       Tr_Rr_Candidate.Tr, Tr_Rr_Candidate.Rr,
                                       rangingTable->Tf, rangingTable->Rf);
     
-    DEBUG_PRINT("[local_%u <- neighbor_%u]: SR dist = %d, time = %llu\n", MY_UWB_ADDRESS, rangingTable->neighborAddress, distance, rangingTable->Re.timestamp.full % UWB_MAX_TIMESTAMP);
+    DEBUG_PRINT("[local_%u <- neighbor_%u]: %s dist = %d, time = %llu\n", MY_UWB_ADDRESS, rangingTable->neighborAddress, RANGING_MODE, distance, rangingTable->Re.timestamp.full % UWB_MAX_TIMESTAMP);
     
     if (distance > 0) {
         rangingTable->distance = distance;
