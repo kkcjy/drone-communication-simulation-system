@@ -161,7 +161,7 @@ def write_ranging_Log(ieee, ieee_sys_time, sr_v1, sr_v1_sys_time, sr_v2, sr_v2_s
             filtered_dsr.append(dsr[dsr_idx[t]])
             filtered_vicon.append(vicon[idx_vicon])
             filtered_time.append(t)
-            writer.writerow([ieee[ieee_idx[t]], sr_v1[sr_v1_idx[t]], sr_v2[sr_v2_idx[t]], dsr[dsr_idx[t]], vicon[idx_vicon], t])
+            writer.writerow([f"{ieee[ieee_idx[t]]:.1f}", f"{sr_v1[sr_v1_idx[t]]:.1f}", f"{sr_v2[sr_v2_idx[t]]:.1f}", f"{dsr[dsr_idx[t]]:.1f}", f"{vicon[idx_vicon]:.4f}", f"{t}"])
             count += 1
     print(f"Ranging log saved to {output_path}, total {count} records.")
 
@@ -181,7 +181,6 @@ def get_align_data(ieee, sr_v1, sr_v2, dsr, sys_time, vicon, vicon_sys_time):
         sr_v2_mean = mean_in_window(sr_v2, sys_time)
         dsr_mean = mean_in_window(dsr, sys_time)
         vicon_mean = mean_in_window(vicon, vicon_sys_time)
-
         avg_diff = np.nanmean([vicon_mean - ieee_mean, vicon_mean - sr_v1_mean, vicon_mean - sr_v2_mean, vicon_mean - dsr_mean])
         return avg_diff
 
@@ -213,7 +212,7 @@ def evaluation_data(align_ieee, ieee_sys_time, align_sr_v1, sr_v1_sys_time, alig
         mean_re = np.mean(np.abs(predicted - ground_truth) / ground_truth) * 100
         return mean_ae, max_ae, rmse, mean_re
 
-    def valid_filter_and_metrics(align_data, sys_time, align_vicon, vicon_sys_time, avg_diff):
+    def single_valid_filter_and_metrics(align_data, sys_time, align_vicon, vicon_sys_time, avg_diff):
         filtered, vicon_for_data = [], []
         for i, t in enumerate(sys_time):
             if align_data[i] == avg_diff + invalid_sign:
@@ -255,15 +254,15 @@ def evaluation_data(align_ieee, ieee_sys_time, align_sr_v1, sr_v1_sys_time, alig
     align_vicon = np.array(align_vicon)
     vicon_sys_time = np.array(vicon_sys_time)
 
-    ieee_filtered, vicon_for_ieee, invalid_rate_ieee = valid_filter_and_metrics(align_ieee, ieee_sys_time, align_vicon, vicon_sys_time, avg_diff)
-    sr_v1_filtered, vicon_for_sr_v1, invalid_rate_sr_v1 = valid_filter_and_metrics(align_sr_v1, sr_v1_sys_time, align_vicon, vicon_sys_time, avg_diff)
-    sr_v2_filtered, vicon_for_sr_v2, invalid_rate_sr_v2 = valid_filter_and_metrics(align_sr_v2, sr_v2_sys_time, align_vicon, vicon_sys_time, avg_diff)
-    dsr_filtered, vicon_for_dsr, invalid_rate_dsr = valid_filter_and_metrics(align_dsr, dsr_sys_time, align_vicon, vicon_sys_time, avg_diff)
+    ieee_f, vicon_for_ieee, invalid_rate_ieee = single_valid_filter_and_metrics(align_ieee, ieee_sys_time, align_vicon, vicon_sys_time, avg_diff)
+    sr_v1_f, vicon_for_sr_v1, invalid_rate_sr_v1 = single_valid_filter_and_metrics(align_sr_v1, sr_v1_sys_time, align_vicon, vicon_sys_time, avg_diff)
+    sr_v2_f, vicon_for_sr_v2, invalid_rate_sr_v2 = single_valid_filter_and_metrics(align_sr_v2, sr_v2_sys_time, align_vicon, vicon_sys_time, avg_diff)
+    dsr_f, vicon_for_dsr, invalid_rate_dsr = single_valid_filter_and_metrics(align_dsr, dsr_sys_time, align_vicon, vicon_sys_time, avg_diff)
 
-    mean_ae_ieee, max_ae_ieee, rmse_ieee, mre_ieee = compute_error_metrics(ieee_filtered, vicon_for_ieee)
-    mean_ae_sr_v1, max_ae_sr_v1, rmse_sr_v1, mre_sr_v1 = compute_error_metrics(sr_v1_filtered, vicon_for_sr_v1)
-    mean_ae_sr_v2, max_ae_sr_v2, rmse_sr_v2, mre_sr_v2 = compute_error_metrics(sr_v2_filtered, vicon_for_sr_v2)
-    mean_ae_dsr, max_ae_dsr, rmse_dsr, mre_dsr = compute_error_metrics(dsr_filtered, vicon_for_dsr)
+    mean_ae_ieee, max_ae_ieee, rmse_ieee, mre_ieee = compute_error_metrics(ieee_f, vicon_for_ieee)
+    mean_ae_sr_v1, max_ae_sr_v1, rmse_sr_v1, mre_sr_v1 = compute_error_metrics(sr_v1_f, vicon_for_sr_v1)
+    mean_ae_sr_v2, max_ae_sr_v2, rmse_sr_v2, mre_sr_v2 = compute_error_metrics(sr_v2_f, vicon_for_sr_v2)
+    mean_ae_dsr, max_ae_dsr, rmse_dsr, mre_dsr = compute_error_metrics(dsr_f, vicon_for_dsr)
 
     print("==== Error metrics for all valid data ====")
     print(f"IEEE : Mean AE(平均绝对误差) = {mean_ae_ieee:.3f} cm, Max AE(最大绝对误差) = {max_ae_ieee:.3f} cm, RMSE(均方根误差) = {rmse_ieee:.3f} cm, MRE(平均相对误差) = {mre_ieee:.3f}%, Invalid Rate(计算失败率) = {invalid_rate_ieee:.2f}%")
@@ -274,24 +273,20 @@ def evaluation_data(align_ieee, ieee_sys_time, align_sr_v1, sr_v1_sys_time, alig
     ieee_c, sr_v1_c, sr_v2_c, dsr_c, vicon_c, time_c, invalid_rate_common = common_valid_filter_and_metrics(align_ieee, align_sr_v1, align_sr_v2, align_dsr, ieee_sys_time, align_vicon, vicon_sys_time, avg_diff)
 
     mean_ae_ieee_c, max_ae_ieee_c, rmse_ieee_c, mre_ieee_c = compute_error_metrics(ieee_c, vicon_c)
-    mean_ae_sr_v1_c, max_ae_sr_v1_c, rmse_sr_v1_c, mre_sr_v1_c = compute_error_metrics(sr_v1_c, vicon_c)
-    mean_ae_sr_v2_c, max_ae_sr_v2_c, rmse_sr_v2_c, mre_sr_v2_c = compute_error_metrics(sr_v2_c, vicon_c)
     mean_ae_dsr_c, max_ae_dsr_c, rmse_dsr_c, mre_dsr_c = compute_error_metrics(dsr_c, vicon_c)
 
     print("==== Error Metrics for Common Valid Data ====")
-    print(f"IEEE : Mean AE(平均绝对误差) = {mean_ae_ieee_c:.3f} cm, Max AE(最大绝对误差) = {max_ae_ieee_c:.3f} cm, RMSE(均方根误差) = {rmse_ieee_c:.3f} cm, MRE(平均相对误差) = {mre_ieee_c:.3f}%, Invalid Rate(计算失败率) = {invalid_rate_common:.2f}%")
-    print(f"SR_V1: Mean AE(平均绝对误差) = {mean_ae_sr_v1_c:.3f} cm, Max AE(最大绝对误差) = {max_ae_sr_v1_c:.3f} cm, RMSE(均方根误差) = {rmse_sr_v1_c:.3f} cm, MRE(平均相对误差) = {mre_sr_v1_c:.3f}%, Invalid Rate(计算失败率) = {invalid_rate_common:.2f}%")
-    print(f"SR_V2: Mean AE(平均绝对误差) = {mean_ae_sr_v2_c:.3f} cm, Max AE(最大绝对误差) = {max_ae_sr_v2_c:.3f} cm, RMSE(均方根误差) = {rmse_sr_v2_c:.3f} cm, MRE(平均相对误差) = {mre_sr_v2_c:.3f}%, Invalid Rate(计算失败率) = {invalid_rate_common:.2f}%")
-    print(f"DSR  : Mean AE(平均绝对误差) = {mean_ae_dsr_c:.3f} cm, Max AE(最大绝对误差) = {max_ae_dsr_c:.3f} cm, RMSE(均方根误差) = {rmse_dsr_c:.3f} cm, MRE(平均相对误差) = {mre_dsr_c:.3f}%, Invalid Rate(计算失败率) = {invalid_rate_common:.2f}%")
+    print(f"CLASSIC: Mean AE(平均绝对误差) = {mean_ae_ieee_c:.3f} cm, Max AE(最大绝对误差) = {max_ae_ieee_c:.3f} cm, RMSE(均方根误差) = {rmse_ieee_c:.3f} cm, MRE(平均相对误差) = {mre_ieee_c:.3f}%, Invalid Rate(计算失败率) = {invalid_rate_common:.2f}%")
+    print(f"DSR    : Mean AE(平均绝对误差) = {mean_ae_dsr_c:.3f} cm, Max AE(最大绝对误差) = {max_ae_dsr_c:.3f} cm, RMSE(均方根误差) = {rmse_dsr_c:.3f} cm, MRE(平均相对误差) = {mre_dsr_c:.3f}%, Invalid Rate(计算失败率) = {invalid_rate_common:.2f}%")
 
 
-def ranging_plot(sr, sr_sys_time, dsr, dsr_sys_time, vicon, vicon_sys_time):
-    plt.plot(sr_sys_time, sr, color='#4A90E2', label='SR', linestyle='--', marker='x', markersize=4, linewidth=1.5)
-    plt.plot(dsr_sys_time, dsr, color="#E4491E", label='DSR', linestyle='--', marker='x', markersize=4, linewidth=1.5)
-    plt.plot(vicon_sys_time, vicon, color="#9DF423", label='VICON', alpha=0.8, linestyle='-', marker='o', markersize=4, linewidth=2)
+def ranging_plot(ranging1, ranging1_sys_time, ranging2, ranging2_sys_time, vicon, vicon_sys_time, name1="RANGING1", name2="RANGING2"):
+    plt.plot(ranging1_sys_time, ranging1, color='#4A90E2', label=name1, linestyle='--', marker='x', markersize=4, linewidth=1.5)
+    plt.plot(ranging2_sys_time, ranging2, color="#E4491E", label=name2, linestyle='--', marker='x', markersize=4, linewidth=1.5)
+    plt.plot(vicon_sys_time, vicon, color="#9DF423", label='VICON', alpha=0.8, linestyle='-', marker='o', markersize=4, linewidth=1.5)
     plt.xlabel('Time (ms)') 
     plt.ylabel('Distance Measurement')
-    plt.title('SR_V2 vs DSR vs VICON Distance Measurements Over Absolute Time')
+    plt.title(f'{name1} vs {name2} vs VICON Distance Measurements Over Absolute Time')
     plt.legend()
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.tight_layout()
@@ -311,4 +306,4 @@ if __name__ == '__main__':
 
     evaluation_data(align_ieee, sys_time, align_sr_v1, sys_time, align_sr_v2, sys_time, align_dsr, sys_time, align_vicon, vicon_sys_time, avg_diff)
 
-    ranging_plot(align_sr_v2, sr_v2_sys_time, align_dsr, dsr_sys_time, align_vicon, vicon_sys_time)
+    ranging_plot(align_sr_v2, sr_v2_sys_time, align_dsr, dsr_sys_time, align_vicon, vicon_sys_time, name1="SR_V2", name2="DSR")
