@@ -35,7 +35,7 @@ The data processing script `data_process.py` is located in the drone firmware pr
 
 #### Data Processing Steps
 
-1. Place the raw data file collected by the sniffer into the `sniffer/data/` directory
+1. The raw data files collected by the sniffer are placed in the sniffer/data/ directory, and the data collected by VICON are placed in simulation/data. Extract these files and place them into data/raw_sensor_data.csv and data/vicon.txt of this project respectively.
 2. Edit `data_process.py` and modify the following parameters:
    - `FILE_NAME`: Name of the sniffer data file
    - `DRONE_NUM`: Number of drones in the simulation
