@@ -2,20 +2,38 @@
 
 
 Drone_Node_Set_t *droneNodeSet;
-pthread_mutex_t broadcast_rangingMessage_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t task_allocation_mutex = PTHREAD_MUTEX_INITIALIZER;
+sem_t allocation_sem;               // allocation of task(TX / RX)
+sem_t broadcast_sem;                // broadcast of messages
+sem_t response_sem;                 // response of simu_msg
+pthread_mutex_t response_mutex;
+int response_count = 0;
 
 
 void droneNodeSet_init() {
     droneNodeSet = (Drone_Node_Set_t*)malloc(sizeof(Drone_Node_Set_t));
     memset(droneNodeSet->node, 0, sizeof(droneNodeSet->node));
-
     droneNodeSet->count = 0;
-
     if(pthread_mutex_init(&droneNodeSet->mutex, NULL) != 0) {
-        perror("Mutex init failed");
+        perror("droneNodeSet->mutex init failed");
         free(droneNodeSet);
         droneNodeSet = NULL;
+        exit(EXIT_FAILURE);
+    }
+
+    if (sem_init(&allocation_sem, 0, 1) != 0) {
+        perror("sem_init allocation_sem failed");
+        exit(EXIT_FAILURE);
+    }
+    if (sem_init(&broadcast_sem, 0, 0) != 0) {
+        perror("sem_init broadcast_sem failed");
+        exit(EXIT_FAILURE);
+    }
+    if (sem_init(&response_sem, 0, 1) != 0) {
+        perror("sem_init response_sem failed");
+        exit(EXIT_FAILURE);
+    }
+    if (pthread_mutex_init(&response_mutex, NULL) != 0) {
+        perror("response_mutex init failed");
         exit(EXIT_FAILURE);
     }
 }
@@ -73,15 +91,14 @@ void *broadcast_flightLog(void *arg) {
     // Broadcast flight log to all drones
     while (fgets(line, sizeof(line), fp)) {
         if((line_count++ / NODES_NUM) % RANGING_PERIOD_RATE == 0) {
-            usleep(READ_PERIOD * 1000); 
+            // usleep(READ_PERIOD * 1000);
 
             if (*line == '\n' || *line == '\0') {
                 break;
             }
 
-            //wait for broadcast_rangingMessage
-            pthread_mutex_lock(&task_allocation_mutex);
-            pthread_mutex_lock(&broadcast_rangingMessage_mutex);
+            sem_wait(&allocation_sem);
+            sem_wait(&response_sem);
 
             // Tx task allocation
             Line_Message_t Tx_line_message;
@@ -118,11 +135,6 @@ void *broadcast_flightLog(void *arg) {
                 token = strtok(NULL, ",");
                 Rx_line_message.timestamp.full = (uint64_t)strtoull(token, NULL, 10);
 
-                // Skip packet loss cases
-                if(Rx_line_message.timestamp.full == 0) {
-                    continue;
-                }
-
                 for(int j = 0; j < droneNodeSet->count; j++) {
                     if((uint16_t)strtoul(droneNodeSet->node[j].address, NULL, 10) == Rx_line_message.address) {
                         printf("[broadcast_flightLog]: Rx address = %d, Rx timestamp = %lu\n", Rx_line_message.address, Rx_line_message.timestamp.full);
@@ -138,7 +150,7 @@ void *broadcast_flightLog(void *arg) {
                     }
                 }
             }
-            pthread_mutex_unlock(&broadcast_rangingMessage_mutex);
+            sem_post(&broadcast_sem);
         }       
     }
 
@@ -161,31 +173,35 @@ void *handle_node_connection(void *arg) {
     }
     node_address[bytes_received] = '\0';
     
-    if (droneNodeSet->count < NODES_NUM) {
-        droneNodeSet->node[droneNodeSet->count].socket = node_socket;
-        strncpy(droneNodeSet->node[droneNodeSet->count].address, node_address, ADDR_SIZE);
-        droneNodeSet->count++;
-        printf("New drone connected: %s\n", droneNodeSet->node[droneNodeSet->count - 1].address);
-    }
-    else {
-        printf("Max nodes reached (%d), rejecting %s\n", NODES_NUM, node_address);
-        close(node_socket);
-        pthread_mutex_unlock(&droneNodeSet->mutex);
-        return NULL;
-    }
+    droneNodeSet->node[droneNodeSet->count].socket = node_socket;
+    strncpy(droneNodeSet->node[droneNodeSet->count].address, node_address, ADDR_SIZE);
+    droneNodeSet->count++;
     pthread_mutex_unlock(&droneNodeSet->mutex);
+    printf("New drone connected: %s\n", droneNodeSet->node[droneNodeSet->count - 1].address);
 
     // Broadcast received message to all nodes
     Simu_Message_t simu_msg;
     while ((bytes_received = recv(node_socket, &simu_msg, sizeof(simu_msg), 0)) > 0) {
-        Ranging_Message_t *ranging_msg = (Ranging_Message_t*)simu_msg.payload;
-        // printf("[broadcast_rangingMessage]: address = %d, msgSeq = %d\n", ranging_msg->header.srcAddress, ranging_msg->header.msgSequence);
-        
-        // wait for task allocation
-        pthread_mutex_lock(&broadcast_rangingMessage_mutex);
-        broadcast_rangingMessage(&simu_msg);
-        pthread_mutex_unlock(&broadcast_rangingMessage_mutex);
-        pthread_mutex_unlock(&task_allocation_mutex);
+        if(simu_msg.size == sizeof(Ranging_Message_t)) {
+            Ranging_Message_t *ranging_msg = (Ranging_Message_t*)simu_msg.payload;
+            // printf("[broadcast_rangingMessage]: address = %d, msgSeq = %d\n", ranging_msg->header.srcAddress, ranging_msg->header.msgSequence);
+            
+            sem_wait(&broadcast_sem);
+            sem_wait(&response_sem);
+            broadcast_rangingMessage(&simu_msg);
+            sem_post(&allocation_sem);
+        }
+        else if(simu_msg.size == sizeof(Line_Message_t)) {
+            pthread_mutex_lock(&response_mutex);
+            response_count++;
+            if(response_count == NODES_NUM - 1) {
+                // All responses received
+                sem_post(&response_sem);
+                response_count = 0;
+            }
+            pthread_mutex_unlock(&response_mutex);
+        }
+
     }
 
     // Handle disconnection

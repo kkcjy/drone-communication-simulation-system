@@ -31,7 +31,19 @@ void send_to_center(int center_socket, const char* address, const Ranging_Messag
     }
 }
 
+void response_to_center(int center_socket, const char* address) {
+    Simu_Message_t simu_msg;
+
+    snprintf(simu_msg.srcAddress, sizeof(simu_msg.srcAddress), "%s", address);
+    simu_msg.size = sizeof(Line_Message_t);
+
+    if (send(center_socket, &simu_msg, sizeof(Simu_Message_t), 0) < 0) {
+        perror("Send failed");
+    }
+}
+
 void TxCallBack(int center_socket, dwTime_t timestamp) {
+    printf("tx\n");
     #if defined(CLASSIC_RANGING_MODE)
         Ranging_Message_t ranging_msg;
 
@@ -66,9 +78,11 @@ void TxCallBack(int center_socket, dwTime_t timestamp) {
     #endif
 }
 
-void RxCallBack(Ranging_Message_t *rangingMessage, dwTime_t timestamp) {
+void RxCallBack(int center_socket, Ranging_Message_t *rangingMessage, dwTime_t timestamp) {
+    printf("rx\n");
     int randnum = rand() % 10000;
-    if (randnum < (int)(PACKET_LOSS * 10000)) {
+    if (randnum < (int)(PACKET_LOSS * 10000) || timestamp.full == 0) {
+        response_to_center(center_socket, localAddress);
         return;
     }
 
@@ -79,6 +93,8 @@ void RxCallBack(Ranging_Message_t *rangingMessage, dwTime_t timestamp) {
         
         processRangingMessage(&rangingMessageWithTimestamp);
 
+        response_to_center(center_socket, localAddress);
+
         // printf("Rxcall, Rx timestamp = %lu\n", timestamp.full);
 
         // reset of RxTimestamp in other place
@@ -88,6 +104,8 @@ void RxCallBack(Ranging_Message_t *rangingMessage, dwTime_t timestamp) {
         rangingMessageWithAdditionalInfo.timestamp = timestamp;
 
         processDSRMessage(&rangingMessageWithAdditionalInfo);
+
+        response_to_center(center_socket, localAddress);
 
         // printf("Rxcall, Rx timestamp = %lu\n", timestamp.full);
 
@@ -123,18 +141,16 @@ void *receive_from_center(void *arg) {
                     // receiver
                     else if(line_message->status == RX) {
                         RxTimestamp.full = line_message->timestamp.full % UWB_MAX_TIMESTAMP;
+                        response_to_center(center_socket, localAddress);
                     }
                 }
             }
 
             // handle message of rangingMessage
             else if(simu_msg.size == sizeof(Ranging_Message_t)) {
-                // wait for flightLog
-                if(RxTimestamp.full == 0) {
-                    continue;
-                }
+                printf("rm\n");
                 Ranging_Message_t *ranging_msg = (Ranging_Message_t*)simu_msg.payload;
-                RxCallBack(ranging_msg, RxTimestamp);
+                RxCallBack(center_socket, ranging_msg, RxTimestamp);
             }
             else {
                 printf("Received unknown message size: %zu\n", simu_msg.size);
