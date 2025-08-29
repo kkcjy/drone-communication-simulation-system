@@ -43,7 +43,6 @@ void response_to_center(int center_socket, const char* address) {
 }
 
 void TxCallBack(int center_socket, dwTime_t timestamp) {
-    printf("tx\n");
     #if defined(CLASSIC_RANGING_MODE)
         Ranging_Message_t ranging_msg;
 
@@ -79,7 +78,6 @@ void TxCallBack(int center_socket, dwTime_t timestamp) {
 }
 
 void RxCallBack(int center_socket, Ranging_Message_t *rangingMessage, dwTime_t timestamp) {
-    printf("rx\n");
     int randnum = rand() % 10000;
     if (randnum < (int)(PACKET_LOSS * 10000) || timestamp.full == 0) {
         response_to_center(center_socket, localAddress);
@@ -148,7 +146,6 @@ void *receive_from_center(void *arg) {
 
             // handle message of rangingMessage
             else if(simu_msg.size == sizeof(Ranging_Message_t)) {
-                printf("rm\n");
                 Ranging_Message_t *ranging_msg = (Ranging_Message_t*)simu_msg.payload;
                 RxCallBack(center_socket, ranging_msg, RxTimestamp);
             }
