@@ -19,12 +19,14 @@ neighbor_address = 3
 # rightbound = 1423480
 # leftbound = 1719676
 # rightbound = 1725063
-leftbound = 2056100
-rightbound = 2066600
+# leftbound = 2056100
+# rightbound = 2066600
+leftbound = 562850
+rightbound = 574910
 invalid_sign = -1
 
-ranging_log_path = 'data/ranging_log.csv'
-vicon_path = "data/vicon.txt"
+ranging_log_path = '../data/ranging_log.csv'
+vicon_path = "../data/vicon.txt"
 
 
 def read_ranging_log():

@@ -21,7 +21,7 @@ void DEBUG_PRINT(const char *format, ...) {
 
     // print to file
     #if defined(IEEE_802_15_4Z)
-    FILE *log_file = first_call ? fopen("./data/log/802_15_4z.txt", "w") : fopen("./data/log/802_15_4z.txt", "a");
+    FILE *log_file = first_call ? fopen("./data/log/ieee.txt", "w") : fopen("./data/log/ieee.txt", "a");
     #elif defined(SWARM_RANGING_V1)
     FILE *log_file = first_call ? fopen("./data/log/swarm_v1.txt", "w") : fopen("./data/log/swarm_v1.txt", "a");
     #elif defined(SWARM_RANGING_V2)

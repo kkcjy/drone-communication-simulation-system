@@ -12,17 +12,17 @@ matplotlib.use('TkAgg')
 # Set the active address and use the target address’s time range as the alignment reference
 local_address = 2
 neighbor_address = 3
-leftbound = 2056100
-rightbound = 2066600
+leftbound = 562850
+rightbound = 574910
 invalid_sign = -1
 
-sys_path = "data/raw_sensor_data.csv"
-ieee_path = "data/log/802_15_4z.txt"
-sr_v1_path = "data/log/swarm_v1.txt"
-sr_v2_path = "data/log/swarm_v2.txt"
-dsr_path = "data/log/dynamic.txt"
-vicon_path = "data/vicon.txt"
-output_path = "data/ranging_log.csv"
+sys_path = "../data/simulation_dep.csv"
+ieee_path = "../data/log/ieee.txt"
+sr_v1_path = "../data/log/swarm_v1.txt"
+sr_v2_path = "../data/log/swarm_v2.txt"
+dsr_path = "../data/log/dynamic.txt"
+vicon_path = "../data/vicon.txt"
+output_path = "../data/ranging_log.csv"
 
 
 def align_sys_time(time_list):
@@ -181,6 +181,7 @@ def get_align_data(ieee, sr_v1, sr_v2, dsr, sys_time, vicon, vicon_sys_time):
         sr_v2_mean = mean_in_window(sr_v2, sys_time)
         dsr_mean = mean_in_window(dsr, sys_time)
         vicon_mean = mean_in_window(vicon, vicon_sys_time)
+
         avg_diff = np.nanmean([vicon_mean - ieee_mean, vicon_mean - sr_v1_mean, vicon_mean - sr_v2_mean, vicon_mean - dsr_mean])
         return avg_diff
 
