@@ -17,7 +17,7 @@
 
 #if defined(CLASSIC_RANGING_MODE)
 #include "adhocuwb_swarm_ranging.h"
-#elif defined(DYNAMIC_RANGING_MODE)
+#elif defined(MODIFIED_RANGING_MODE)
 #include "adhocuwb_dynamic_swarm_ranging.h"
 #endif
 

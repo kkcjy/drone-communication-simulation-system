@@ -17,7 +17,8 @@
 // #define IEEE_802_15_4Z
 // #define SWARM_RANGING_V1
 // #define SWARM_RANGING_V2
-#define DYNAMIC_RANGING_MODE
+// #define DYNAMIC_RANGING_MODE
+#define COMPENSATE_DYNAMIC_RANGING_MODE
 
 #define     NODES_NUM               2       // the total number of drones in the system
 #define     PACKET_LOSS             0       // packet loss rate for simulating communication link quality
@@ -25,6 +26,12 @@
 
 #if defined(IEEE_802_15_4Z) || defined(SWARM_RANGING_V1) || defined(SWARM_RANGING_V2)
 #define CLASSIC_RANGING_MODE
+#elif defined(DYNAMIC_RANGING_MODE) || defined(COMPENSATE_DYNAMIC_RANGING_MODE)
+#define MODIFIED_RANGING_MODE
+#endif
+
+#ifdef COMPENSATE_DYNAMIC_RANGING_MODE
+#define COMPENSATE_ENABLE
 #endif
 
 

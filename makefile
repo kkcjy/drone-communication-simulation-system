@@ -20,8 +20,9 @@ IEEE_MODE_DEFINED   = $(shell grep -v '^[[:space:]]*//' $(SUPPORT_SRC) | grep -q
 SWARM_V1_MODE_DEFINED = $(shell grep -v '^[[:space:]]*//' $(SUPPORT_SRC) | grep -q '^[[:space:]]*#define[[:space:]]*SWARM_RANGING_V1[[:space:]]*$$' && echo 1 || echo 0)
 SWARM_V2_MODE_DEFINED = $(shell grep -v '^[[:space:]]*//' $(SUPPORT_SRC) | grep -q '^[[:space:]]*#define[[:space:]]*SWARM_RANGING_V2[[:space:]]*$$' && echo 1 || echo 0)
 DYNAMIC_MODE_DEFINED  = $(shell grep -v '^[[:space:]]*//' $(SUPPORT_SRC) | grep -q '^[[:space:]]*#define[[:space:]]*DYNAMIC_RANGING_MODE[[:space:]]*$$' && echo 1 || echo 0)
+COMPENSATE_DYNAMIC_MODE_DEFINED  = $(shell grep -v '^[[:space:]]*//' $(SUPPORT_SRC) | grep -q '^[[:space:]]*#define[[:space:]]*COMPENSATE_DYNAMIC_RANGING_MODE[[:space:]]*$$' && echo 1 || echo 0)
 
-MODE_COUNT = $(shell expr $(IEEE_MODE_DEFINED) + $(SWARM_V1_MODE_DEFINED) + $(SWARM_V2_MODE_DEFINED) + $(DYNAMIC_MODE_DEFINED))
+MODE_COUNT = $(shell expr $(IEEE_MODE_DEFINED) + $(SWARM_V1_MODE_DEFINED) + $(SWARM_V2_MODE_DEFINED) + $(DYNAMIC_MODE_DEFINED) + $(COMPENSATE_DYNAMIC_MODE_DEFINED))
 
 ifeq ($(MODE_COUNT),0)
 $(error "Error: No mode defined in $(SUPPORT_SRC)! Please define one mode")
@@ -57,6 +58,13 @@ $(DRONE_OUT): $(DRONE_SRC) $(FRAME_SRC) $(DSR_SRC)
 	$(CC) $(DSR_CFLAGS) -o $@ $(DRONE_SRC) $(DSR_SRC) -lm
 endif
 
+ifeq ($(COMPENSATE_DYNAMIC_MODE_DEFINED),1)
+$(CENTER_OUT): $(CENTER_SRC) $(FRAME_SRC)
+	$(CC) $(DSR_CFLAGS) -o $@ $(CENTER_SRC) -lm
+$(DRONE_OUT): $(DRONE_SRC) $(FRAME_SRC) $(DSR_SRC)
+	$(CC) $(DSR_CFLAGS) -o $@ $(DRONE_SRC) $(DSR_SRC) -lm
+endif
+
 mode:
 ifeq ($(IEEE_MODE_DEFINED),1)
 	@echo "Current mode: IEEE_802_15_4Z"
@@ -66,6 +74,8 @@ else ifeq ($(SWARM_V2_MODE_DEFINED),1)
 	@echo "Current mode: SWARM_RANGING_V2"
 else ifeq ($(DYNAMIC_MODE_DEFINED),1)
 	@echo "Current mode: DYNAMIC_RANGING_MODE"
+else ifeq ($(COMPENSATE_DYNAMIC_MODE_DEFINED),1)
+	@echo "Current mode: COMPENSATE_DYNAMIC_RANGING_MODE"
 endif
 
 clean:

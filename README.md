@@ -23,12 +23,13 @@ The system features lightweight data processing capabilities, supports multiple 
 
 The system configures ranging modes via the `support.h` header file. Ensure only one macro definition is uncommented to avoid mode conflicts. Detailed mode descriptions are as follows:
 
-| Ranging Mode               | Macro Definition                  | Core Features & Application Scenarios                                                                 |
-|----------------------------|-----------------------------------|-------------------------------------------------------------------------------------------------------|
-| IEEE 802.15.4z Standard Mode | `#define IEEE_802_15_4Z`          | Complies with 802.15.4z standard, supports UWB ranging, suitable for high-precision scenarios.         |
-| Swarm Ranging V1           | `#define SWARM_RANGING_V1`        | Optimized for low-latency needs of drone swarms, lightweight protocol, suitable for small-scale clusters. |
-| Swarm Ranging V2           | `#define SWARM_RANGING_V2`        | Enhanced version of V1 with packet loss retransmission and anti-interference, suitable for medium-to-large clusters. |
-| Dynamic Ranging Mode       | `#define DYNAMIC_RANGING_MODE`    | Adaptively adjusts ranging period and power to balance precision and energy consumption, suitable for complex dynamic scenarios. |
+| Ranging Mode | Macro Definition | Core Features & Application Scenarios |
+|--------------|------------------|----------------------------------------|
+| IEEE 802.15.4z Standard Mode | `#define IEEE_802_15_4Z` | Complies with the IEEE 802.15.4z standard, supports UWB ranging, and provides basic high-precision ranging capabilities. |
+| Swarm Ranging V1 | `#define SWARM_RANGING_V1` | Optimized for low-latency requirements of drone swarms, uses a lightweight protocol, and is suitable for simple coordination scenarios in small-scale clusters. |
+| Swarm Ranging V2 | `#define SWARM_RANGING_V2` | An enhanced version of V1 with packet loss retransmission mechanisms and anti-interference capabilities, improving communication reliability in complex environments. Suitable for medium to large-scale clusters. |
+| Dynamic Ranging Mode | `#define DYNAMIC_RANGING_MODE` | Specifically optimized for scenarios with rapid relative movement of drones. Dynamically adjusts parameters to ensure a 0% computational failure rate, guaranteeing stable ranging under high-speed motion conditions. |
+| Compensated Dynamic Ranging Mode | `#define COMPENSATE_DYNAMIC_RANGING_MODE` | Builds upon dynamic ranging by integrating advanced motion compensation algorithms. Effectively reduces ranging lag errors caused by relative motion through prediction and real-time compensation. Ideal for high-speed drone formations and complex applications requiring precise collaborative control. |
 
 **Mode Check Command**: Execute `make mode` in the project root directory to quickly confirm the currently enabled ranging mode.
 
@@ -80,9 +81,10 @@ Modify `support.h` for core configurations:
 Example for enabling IEEE 802.15.4z mode:
 ```c
 #define IEEE_802_15_4Z                       // Enable 802.15.4z mode
-// #define SWARM_RANGING_V1                  // Enable Swarm Ranging V1 (comment to disable)
-// #define SWARM_RANGING_V2                  // Enable Swarm Ranging V2 (comment to disable)
-// #define DYNAMIC_RANGING_MODE              // Enable Dynamic Ranging Mode (comment to disable)
+// #define SWARM_RANGING_V1                  // Enable Swarm Ranging V1
+// #define SWARM_RANGING_V2                  // Enable Swarm Ranging V2
+// #define DYNAMIC_RANGING_MODE              // Enable Dynamic Ranging Mode
+// #define COMPENSATE_DYNAMIC_RANGING_MODE   // Enable Dynamic Ranging Mode
 ```
 
 #### (2) Modify Core Simulation Parameters
@@ -130,30 +132,17 @@ Example: `./drone 1`
 - Drones receive logs, generate ranging messages, send to the controller, which broadcasts to all nodes for multi-node communication simulation.
 
 
-## Data Analysis Tools
+## Data Analysis Tools(evaluation.py)
 
-### 1. evaluation.py (Performance Evaluation)
+### Core Function
+- Integrates processed data from 5 modes, aligns with VICON ground truth, calculates errors (absolute, RMSE), latency, stability, and generates visual reports.
+- Initial usage saves data to a CSV file, enabling subsequent direct access via the read function without maintaining log files(RESULT_REPRODUCTION = True).
 
-#### Core Function
-Integrates processed data from 4 modes, aligns with VICON ground truth, calculates errors (absolute, RMSE), latency, stability, and generates visual reports.
-
-#### Key Parameters (Modify in script)
+### Key Parameters (Modify in script)
 - `local_address`: Local drone address (e.g., 1, reference node).
 - `neighbor_address`: Neighbor drone address (e.g., 2, target node).
 - `leftbound`: Timestamp start (e.g., 1620000000).
 - `rightbound`: Timestamp end (e.g., 1620001000).
-
-### 2. optimize.py (Parameter Optimization)
-
-#### Core Function
-Reads ranging results, analyzes error patterns (linear deviation, noise), calculates compensation coefficients to reduce errors.
-
-#### Key Parameters (Same as evaluation.py)
-- `local_address`, `neighbor_address`: Target ranging nodes.
-- `leftbound`, `rightbound`: Consistent analysis time range.
-
-#### Note
-Ensure `COMPENSATE_ENABLE` in `support.h` is commented to prevent compensation conflicts.
 
 
 ## System Components

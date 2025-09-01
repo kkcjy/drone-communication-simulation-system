@@ -5,7 +5,7 @@
 const char* localAddress;
 #if defined(CLASSIC_RANGING_MODE)
 extern Ranging_Table_Set_t rangingTableSet;
-#elif defined(DYNAMIC_RANGING_MODE)
+#elif defined(MODIFIED_RANGING_MODE)
 extern Ranging_Table_Set_t *rangingTableSet;
 #endif
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;      // mutex for synchronizing access to the rangingTableSet
@@ -58,7 +58,7 @@ void TxCallBack(int center_socket, dwTime_t timestamp) {
         // printf("Txcall, Txtimesatamp = %lu\n", timestamp.full);
 
         // reset of TxTimestamp in other place
-    #elif defined(DYNAMIC_RANGING_MODE)
+    #elif defined(MODIFIED_RANGING_MODE)
         Ranging_Message_t ranging_msg;
 
         generateDSRMessage(&ranging_msg);
@@ -96,7 +96,7 @@ void RxCallBack(int center_socket, Ranging_Message_t *rangingMessage, dwTime_t t
         // printf("Rxcall, Rx timestamp = %lu\n", timestamp.full);
 
         // reset of RxTimestamp in other place
-    #elif defined(DYNAMIC_RANGING_MODE)
+    #elif defined(MODIFIED_RANGING_MODE)
         Ranging_Message_With_Additional_Info_t rangingMessageWithAdditionalInfo;
         rangingMessageWithAdditionalInfo.rangingMessage = *rangingMessage;
         rangingMessageWithAdditionalInfo.timestamp = timestamp;
@@ -174,7 +174,7 @@ int main(int argc, char *argv[]) {
 
     #if defined(CLASSIC_RANGING_MODE)
         rangingTableSetInit(&rangingTableSet);
-    #elif defined(DYNAMIC_RANGING_MODE)
+    #elif defined(MODIFIED_RANGING_MODE)
         rangingTableSetInit();
     #endif
 
