@@ -25,6 +25,12 @@ static bool turning_state[NEIGHBOR_ADDRESS_MAX + 1] = {[0 ... NEIGHBOR_ADDRESS_M
 static double compensateRate = NULL_RATE;
 #endif
 
+#if defined(DYNAMIC_RANGING_MODE)
+#define     RANGING_MODE            "DSR"
+#elif defined(COMPENSATE_DYNAMIC_RANGING_MODE)
+#define     RANGING_MODE            "CDSR"
+#endif
+
 #ifdef OPTIMAL_RANGING_SCHEDULE_ENABLE
 static int8_t rangingPeriodFineTune = 0;
 
@@ -1587,7 +1593,7 @@ void processDSRMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWit
             last_DSR[neighborAddress] = DSR[neighborAddress];
             his_avg_DSR[neighborAddress] = DSR[neighborAddress];
             last_Seq[neighborAddress] = rangingMessage->header.msgSequence;
-            DEBUG_PRINT("[local_%u <- neighbor_%u]: DSR dist = %f", MY_UWB_ADDRESS, neighborAddress, (double)DSR[neighborAddress]);
+            DEBUG_PRINT("[local_%u <- neighbor_%u]: %s dist = %f", MY_UWB_ADDRESS, neighborAddress, RANGING_MODE, (double)DSR[neighborAddress]);
         }
         else if(last_SeqGap[neighborAddress] == NULL_SEQ) {
             turning_state[neighborAddress] = (DSR[neighborAddress] - last_DSR[neighborAddress]) >= 0;
@@ -1595,7 +1601,7 @@ void processDSRMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWit
             last_DSR[neighborAddress] = DSR[neighborAddress];
             his_avg_DSR[neighborAddress] = (his_avg_DSR[neighborAddress] + DSR[neighborAddress]) / 2;
             last_Seq[neighborAddress] = rangingMessage->header.msgSequence;
-            DEBUG_PRINT("[local_%u <- neighbor_%u]: DSR dist = %f", MY_UWB_ADDRESS, neighborAddress, (double)DSR[neighborAddress]);
+            DEBUG_PRINT("[local_%u <- neighbor_%u]: %s dist = %f", MY_UWB_ADDRESS, neighborAddress, RANGING_MODE, (double)DSR[neighborAddress]);
         }
         else {
             // calculate compensateDis
@@ -1622,21 +1628,21 @@ void processDSRMessage(Ranging_Message_With_Additional_Info_t *rangingMessageWit
                     if(seqGap > UINT16_MAX / 2) {
                         last_SeqGap[neighborAddress] = 0;
                     }
-                    DEBUG_PRINT("[local_%u <- neighbor_%u]: DSR dist = %f", MY_UWB_ADDRESS, neighborAddress, (double)DSR[neighborAddress]);
+                    DEBUG_PRINT("[local_%u <- neighbor_%u]: %s dist = %f", MY_UWB_ADDRESS, neighborAddress, RANGING_MODE, (double)DSR[neighborAddress]);
                 }
                 else if(judge_static) {
-                    DEBUG_PRINT("[local_%u <- neighbor_%u]: DSR dist = %f", MY_UWB_ADDRESS, neighborAddress, (double)DSR[neighborAddress]);
+                    DEBUG_PRINT("[local_%u <- neighbor_%u]: %s dist = %f", MY_UWB_ADDRESS, neighborAddress, RANGING_MODE, (double)DSR[neighborAddress]);
                 }
                 else if(judge_deceleration || judge_turning) {
-                    DEBUG_PRINT("[local_%u <- neighbor_%u]: DSR dist = %f", MY_UWB_ADDRESS, neighborAddress, (double)DSR[neighborAddress]);
+                    DEBUG_PRINT("[local_%u <- neighbor_%u]: %s dist = %f", MY_UWB_ADDRESS, neighborAddress, RANGING_MODE, (double)DSR[neighborAddress]);
                 }
                 else {
-                    DEBUG_PRINT("[local_%u <- neighbor_%u]: DSR dist = %f", MY_UWB_ADDRESS, neighborAddress, CDSR);
+                    DEBUG_PRINT("[local_%u <- neighbor_%u]: %s dist = %f", MY_UWB_ADDRESS, neighborAddress, RANGING_MODE, CDSR);
                 }
             }
         }
     #else
-        DEBUG_PRINT("[local_%u <- neighbor_%u]: DSR dist = %f", MY_UWB_ADDRESS, neighborAddress, (double)DSR[neighborAddress]);
+        DEBUG_PRINT("[local_%u <- neighbor_%u]: %s dist = %f", MY_UWB_ADDRESS, neighborAddress, RANGING_MODE, (double)DSR[neighborAddress]);
     #endif
 
     #ifdef COORDINATE_SEND_ENABLE

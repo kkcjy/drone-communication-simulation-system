@@ -120,7 +120,7 @@ def read_dsr_log():
 def read_cdsr_log():
     cdsr_value = []
     cdsr_time = []
-    pattern = re.compile(rf"\[local_(?:{local_address}) <- neighbor_(?:{neighbor_address})\]: DSR dist = (-?\d+\.\d+), time = (\d+)")
+    pattern = re.compile(rf"\[local_(?:{local_address}) <- neighbor_(?:{neighbor_address})\]: CDSR dist = (-?\d+\.\d+), time = (\d+)")
 
     with open(cdsr_path, "r", encoding="utf-8") as f:
         for i, line in enumerate(f):
