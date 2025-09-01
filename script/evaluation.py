@@ -350,9 +350,9 @@ if __name__ == '__main__':
         sr_v1, sr_v1_time, sr_v1_sys_time = read_sr_v1_log()
         sr_v2, sr_v2_time, sr_v2_sys_time = read_sr_v2_log()
         dsr, dsr_time, dsr_sys_time = read_dsr_log()
-        csdr, cdsr_time, cdsr_sys_time = read_cdsr_log()
+        cdsr, cdsr_time, cdsr_sys_time = read_cdsr_log()
         vicon, vicon_sys_time = read_vicon_log()
-        ieee, sr_v1, sr_v2, dsr, cdsr, sys_time = write_ranging_log(ieee, ieee_sys_time, sr_v1, sr_v1_sys_time, sr_v2, sr_v2_sys_time, dsr, dsr_sys_time, csdr, cdsr_sys_time, vicon, vicon_sys_time)
+        ieee, sr_v1, sr_v2, dsr, cdsr, sys_time = write_ranging_log(ieee, ieee_sys_time, sr_v1, sr_v1_sys_time, sr_v2, sr_v2_sys_time, dsr, dsr_sys_time, cdsr, cdsr_sys_time, vicon, vicon_sys_time)
 
     align_ieee, align_sr_v1, align_sr_v2, align_dsr, align_cdsr, align_vicon, avg_diff = get_align_data(ieee, sr_v1, sr_v2, dsr, cdsr, sys_time, vicon, vicon_sys_time)
 
