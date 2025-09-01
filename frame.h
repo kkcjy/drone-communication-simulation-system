@@ -16,16 +16,16 @@
 
 
 #if defined(CLASSIC_RANGING_MODE)
-#include "adhocuwb_swarm_ranging.h"
+#include "AdHocUWB/Inc/adhocuwb_swarm_ranging.h"
 #elif defined(MODIFIED_RANGING_MODE)
-#include "adhocuwb_dynamic_swarm_ranging.h"
+#include "AdHocUWB/Inc/adhocuwb_dynamic_swarm_ranging.h"
 #endif
 
 
 #define     ADDR_SIZE               20
 #define     CENTER_ADDRESS          "CENTER"
 #define     CENTER_IP               "127.0.0.1"
-#define     CENTER_PORT             8888
+#define     CENTER_PORT             8520
 #define     MAX_LINE_LEN            256
 #define     MESSAGE_SIZE            512
 #define     PAYLOAD_SIZE            MESSAGE_SIZE - ADDR_SIZE - sizeof(size_t)

@@ -120,7 +120,7 @@ def read_dsr_log():
 def read_cdsr_log():
     cdsr_value = []
     cdsr_time = []
-    pattern = re.compile(rf"\[local_(?:{local_address}) <- neighbor_(?:{neighbor_address})\]: DSR dist = (-?\d+\.\d+), time = (\d+)")
+    pattern = re.compile(rf"\[local_(?:{local_address}) <- neighbor_(?:{neighbor_address})\]: CDSR dist = (-?\d+\.\d+), time = (\d+)")
 
     with open(cdsr_path, "r", encoding="utf-8") as f:
         for i, line in enumerate(f):
@@ -350,12 +350,12 @@ if __name__ == '__main__':
         sr_v1, sr_v1_time, sr_v1_sys_time = read_sr_v1_log()
         sr_v2, sr_v2_time, sr_v2_sys_time = read_sr_v2_log()
         dsr, dsr_time, dsr_sys_time = read_dsr_log()
-        csdr, cdsr_time, cdsr_sys_time = read_cdsr_log()
+        cdsr, cdsr_time, cdsr_sys_time = read_cdsr_log()
         vicon, vicon_sys_time = read_vicon_log()
-        ieee, sr_v1, sr_v2, dsr, cdsr, sys_time = write_ranging_log(ieee, ieee_sys_time, sr_v1, sr_v1_sys_time, sr_v2, sr_v2_sys_time, dsr, dsr_sys_time, csdr, cdsr_sys_time, vicon, vicon_sys_time)
+        ieee, sr_v1, sr_v2, dsr, cdsr, sys_time = write_ranging_log(ieee, ieee_sys_time, sr_v1, sr_v1_sys_time, sr_v2, sr_v2_sys_time, dsr, dsr_sys_time, cdsr, cdsr_sys_time, vicon, vicon_sys_time)
 
     align_ieee, align_sr_v1, align_sr_v2, align_dsr, align_cdsr, align_vicon, avg_diff = get_align_data(ieee, sr_v1, sr_v2, dsr, cdsr, sys_time, vicon, vicon_sys_time)
 
     evaluation_data(align_ieee, sys_time, align_sr_v1, sys_time, align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, avg_diff)
 
-    ranging_plot(align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, name1="SR_V2", name2="DSR", name3="CDSR")
+    # ranging_plot(align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, name1="SR_V2", name2="DSR", name3="CDSR")
