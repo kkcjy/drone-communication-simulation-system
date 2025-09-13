@@ -91,8 +91,6 @@ void *broadcast_flightLog(void *arg) {
     // Broadcast flight log to all drones
     while (fgets(line, sizeof(line), fp)) {
         if((line_count++ / NODES_NUM) % RANGING_PERIOD_RATE == 0) {
-            // usleep(READ_PERIOD * 1000);
-
             if (*line == '\n' || *line == '\0') {
                 break;
             }

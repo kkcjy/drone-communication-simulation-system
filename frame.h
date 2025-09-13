@@ -29,7 +29,6 @@
 #define     MAX_LINE_LEN            256
 #define     MESSAGE_SIZE            512
 #define     PAYLOAD_SIZE            MESSAGE_SIZE - ADDR_SIZE - sizeof(size_t)
-#define     READ_PERIOD             50
 
 
 const char *FILE_NAME = "./data/simulation_dep.csv";

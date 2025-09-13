@@ -14,12 +14,13 @@
 
 
 /* simulation mode for choosing */
-#define IEEE_802_15_4Z
+// #define IEEE_802_15_4Z
 // #define SWARM_RANGING_V1
 // #define SWARM_RANGING_V2
 // #define DYNAMIC_RANGING_MODE
-// #define COMPENSATE_DYNAMIC_RANGING_MODE
+#define COMPENSATE_DYNAMIC_RANGING_MODE
 
+#define     CHECK_POINT             2       // number of nodes queried for distance between two received messages
 #define     NODES_NUM               2       // the total number of drones in the system
 #define     PACKET_LOSS             0       // packet loss rate for simulating communication link quality
 #define     RANGING_PERIOD_RATE     1       // rate multiplier for ranging data transmission period

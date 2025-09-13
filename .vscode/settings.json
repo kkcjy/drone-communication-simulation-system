@@ -30,6 +30,8 @@
         "unistd.h": "c",
         "adhocuwb_init.h": "c",
         "adhocuwb_platform.h": "c",
-        "frame.h": "c"
+        "frame.h": "c",
+        "inet.h": "c",
+        "in.h": "c"
     }
 }

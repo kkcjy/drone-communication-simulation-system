@@ -14,6 +14,18 @@ extern dwTime_t lastRxTimestamp;
 extern dwTime_t TxTimestamp;                            // store timestamp from flightLog
 extern dwTime_t RxTimestamp;                            // store timestamp from flightLog
 
+#if defined(IEEE_802_15_4Z)
+#define     RANGING_MODE            "IEEE"
+#elif defined(SWARM_RANGING_V1)
+#define     RANGING_MODE            "SR_V1"
+#elif defined(SWARM_RANGING_V2)
+#define     RANGING_MODE            "SR_V2"
+#elif defined(DYNAMIC_RANGING_MODE)
+#define     RANGING_MODE            "DSR"
+#elif defined(COMPENSATE_DYNAMIC_RANGING_MODE)
+#define     RANGING_MODE            "CDSR"
+#endif
+
 
 void send_to_center(int center_socket, const char* address, const Ranging_Message_t *ranging_msg) {
     Simu_Message_t simu_msg;
@@ -91,6 +103,14 @@ void RxCallBack(int center_socket, Ranging_Message_t *rangingMessage, dwTime_t t
         
         processRangingMessage(&rangingMessageWithTimestamp);
 
+        // uint64_t check_interval = ((next_timestamp - timestamp.full + UWB_MAX_TIMESTAMP) % UWB_MAX_TIMESTAMP) / (CHECK_PERIOD + 1);
+        // for(int i = 1; i <= CHECK_POINT; i++) {
+        //     uint64_t check_timestamp = (timestamp.full + check_interval * i) % UWB_MAX_TIMESTAMP;
+        //     uint16_t neighborAddress = rangingMessage->header.srcAddress;
+        //     int16_t distance = getDistance(neighborAddress);
+        //     DEBUG_PRINT("[local_%u <- neighbor_%u]: %s dist = %d, time = %llu\n", localAddress, neighborAddress, RANGING_MODE, -1, check_timestamp);
+        // }
+
         response_to_center(center_socket, localAddress);
 
         // printf("Rxcall, Rx timestamp = %lu\n", timestamp.full);
@@ -102,6 +122,14 @@ void RxCallBack(int center_socket, Ranging_Message_t *rangingMessage, dwTime_t t
         rangingMessageWithAdditionalInfo.timestamp = timestamp;
 
         processDSRMessage(&rangingMessageWithAdditionalInfo);
+
+        // uint64_t check_interval = ((next_timestamp - timestamp.full + UWB_MAX_TIMESTAMP) % UWB_MAX_TIMESTAMP) / (CHECK_PERIOD + 1);
+        // for(int i = 1; i <= CHECK_POINT; i++) {
+        //     uint64_t check_timestamp = (timestamp.full + check_interval * i) % UWB_MAX_TIMESTAMP;
+        //     uint16_t neighborAddress = rangingMessage->header.srcAddress;
+        //     int16_t distance = getCurDistance(neighborAddress, check_timestamp);
+        //     DEBUG_PRINT("[local_%u <- neighbor_%u]: %s dist = %d, time = %llu\n", localAddress, neighborAddress, RANGING_MODE, -1, check_timestamp);
+        // }
 
         response_to_center(center_socket, localAddress);
 
@@ -133,12 +161,12 @@ void *receive_from_center(void *arg) {
                 if(line_message->address == (uint16_t)strtoul(localAddress, NULL, 10)) {
                     // sender
                     if(line_message->status == TX) {
-                        TxTimestamp.full = line_message->timestamp.full % UWB_MAX_TIMESTAMP;
+                        TxTimestamp.full = line_message->timestamp.full;
                         TxCallBack(center_socket, TxTimestamp);
                     }
                     // receiver
                     else if(line_message->status == RX) {
-                        RxTimestamp.full = line_message->timestamp.full % UWB_MAX_TIMESTAMP;
+                        RxTimestamp.full = line_message->timestamp.full;
                         response_to_center(center_socket, localAddress);
                     }
                 }
