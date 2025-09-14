@@ -39,42 +39,29 @@ def plot_rate_histogram(rates, bar_cmap='viridis', edge_color="white",
     for count, patch in zip(counts, patches):
         patch.set_facecolor(cmap(norm(count) * shade))
     
-    plt.axvline(average, color=avg_line_color, linestyle='-.', linewidth=7, 
-                alpha=0.9, dashes=(15, 10),
-                label=f'Mean = {average:.4f} ± {std_dev:.4f}')
+    plt.axvline(average, color=avg_line_color, linestyle='-.', linewidth=5, 
+                alpha=0.9, label=f'Mean = {average:.4f} ± {std_dev:.4f}')
     
     for count, bin_edge in zip(counts, bins):
         if count > 0:
             plt.text(bin_edge + (bins[1]-bins[0])/2, count + max(counts)*0.01, 
                      f'{int(count)}', ha='center', va='bottom', 
-                     fontsize=26, color=text_color, fontweight='bold')
+                     fontsize=26)
     
     ax.spines[['top', 'right']].set_visible(False)
     ax.spines[['left', 'bottom']].set_color(text_color)
     ax.tick_params(colors=text_color, labelsize=26)
     
-    plt.title("Compensation Factor Distribution", fontsize=32, 
-              fontweight='bold', pad=40, color=text_color)
-    plt.xlabel("Compensation Factor Value", fontsize=30, 
-               fontweight='bold', color=text_color, labelpad=30)
-    plt.ylabel("Frequency", fontsize=30, fontweight='bold', 
-               color=text_color, labelpad=30)
+    plt.title("Compensation Factor Distribution", fontsize=32, pad=40)
+    plt.xlabel("Compensation Factor Value", fontsize=30, labelpad=30)
+    plt.ylabel("Frequency", fontsize=30, labelpad=30)
     
     ax.grid(True, alpha=0.3, linestyle='--', color='#666666')
     
-    legend = plt.legend(frameon=True, fancybox=True, 
-                       shadow=True, framealpha=0.95, fontsize=26,
-                       loc='upper right')
+    legend = plt.legend(frameon=True, fancybox=True, shadow=True, framealpha=0.95, fontsize=26, loc='upper right')
     legend.get_frame().set_edgecolor('#444444')
     legend.get_frame().set_linewidth(3.0)
     legend.get_frame().set_facecolor('#f8f8f8')
-    
-    stats_text = f'N = {len(rates):,}'
-    plt.text(0.02, 0.98, stats_text, transform=ax.transAxes, 
-             fontsize=26, verticalalignment='top',
-             bbox=dict(boxstyle='round', facecolor='#f0f0f0', alpha=0.9,
-                      edgecolor='#cccccc', linewidth=3.0),
-             color=text_color)
     
     ax.set_facecolor('#fafafa')
     fig.patch.set_facecolor('#ffffff')
