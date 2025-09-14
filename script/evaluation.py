@@ -12,6 +12,7 @@ matplotlib.use('TkAgg')
 
 # Set the active address and use the target address’s time range as the alignment reference
 RESULT_REPRODUCTION = False
+CHECK_POINT = 2
 local_address = 2
 neighbor_address = 3
 leftbound = 1409700
@@ -41,17 +42,25 @@ def align_sys_time(time_list):
     with open(sys_path, 'r', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
-            sys_time.append(int(row['system_time']))
-            rx_time.append(int(row['Rx0_time']))
+            if int(row['Rx0_addr']) == local_address:
+                sys_time.append(int(row['system_time']))
+                rx_time.append(int(row['Rx0_time']))
 
     index = 0
+    check_interval = 0
     length = len(time_list)
     for i in range(len(rx_time)):
-        if index >= length:
-            break
         if rx_time[i] == time_list[index]:
             align_sys_time.append(sys_time[i])
-            index += 1
+            if index < length - CHECK_POINT - 1:
+                check_interval = (sys_time[i + 1] - sys_time[i]) / (CHECK_POINT + 1)
+                for j in range(1, CHECK_POINT + 1):
+                    align_sys_time.append(sys_time[i] + check_interval * j)
+            else:
+                for j in range(1, CHECK_POINT + 1):
+                    align_sys_time.append(sys_time[i] + check_interval * j)
+                break
+            index += 3
         
     return align_sys_time
 
@@ -177,18 +186,25 @@ def write_ranging_log(ieee, ieee_sys_time, sr_v1, sr_v1_sys_time, sr_v2, sr_v2_s
     filtered_vicon = []
     filtered_time = []
 
+    invalid_ignore = True
+
     with open(output_path, mode='w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(["IEEE", "SR_V1", "SR_V2", "DSR", "CDSR", "VICON", "TIME"])
 
         count = 0
         for t in common_time:
+            if invalid_ignore and (ieee[ieee_idx[t]] == invalid_sign and sr_v1[sr_v1_idx[t]] == invalid_sign and sr_v2[sr_v2_idx[t]] == invalid_sign
+                                   and dsr[dsr_idx[t]] == invalid_sign and cdsr[cdsr_idx[t]] == invalid_sign):
+                continue
+            else:
+                invalid_ignore = False
             idx_vicon = np.argmin(np.abs(vicon_sys_time - t))
             filtered_ieee.append(ieee[ieee_idx[t]])
             filtered_sr_v1.append(sr_v1[sr_v1_idx[t]])
             filtered_sr_v2.append(sr_v2[sr_v2_idx[t]])
-            filtered_cdsr.append(cdsr[cdsr_idx[t]])
             filtered_dsr.append(dsr[dsr_idx[t]])
+            filtered_cdsr.append(cdsr[cdsr_idx[t]])
             filtered_vicon.append(vicon[idx_vicon])
             filtered_time.append(t)
             writer.writerow([f"{ieee[ieee_idx[t]]:.1f}", f"{sr_v1[sr_v1_idx[t]]:.1f}", f"{sr_v2[sr_v2_idx[t]]:.1f}", f"{dsr[dsr_idx[t]]:.1f}", f"{cdsr[cdsr_idx[t]]:.1f}", f"{vicon[idx_vicon]:.4f}", f"{t}"])
@@ -250,7 +266,7 @@ def evaluation_data(align_ieee, ieee_sys_time, align_sr_v1, sr_v1_sys_time, alig
         mean_re = np.mean(np.abs(predicted - ground_truth) / ground_truth) * 100
         return mean_ae, max_ae, rmse, mean_re
 
-    def single_valid_filter_and_metrics(align_data, sys_time, align_vicon, vicon_sys_time, avg_diff):
+    def valid_filter_and_metrics(align_data, sys_time, align_vicon, vicon_sys_time, avg_diff):
         filtered, vicon_for_data = [], []
         for i, t in enumerate(sys_time):
             if align_data[i] == avg_diff + invalid_sign:
@@ -262,26 +278,6 @@ def evaluation_data(align_ieee, ieee_sys_time, align_sr_v1, sr_v1_sys_time, alig
         vicon_for_data = np.array(vicon_for_data)
         invalid_rate = (len(sys_time) - len(filtered)) / len(sys_time) * 100 if len(sys_time) > 0 else np.nan
         return filtered, vicon_for_data, invalid_rate
-
-    def common_valid_filter_and_metrics(ieee, sr_v1, sr_v2, dsr, cdsr, sys_time, align_vicon, vicon_sys_time, avg_diff):
-        f_ieee, f_sr_v1, f_sr_v2, f_dsr, f_cdsr, f_vicon, f_time = [], [], [], [], [], [], []
-        for i, t in enumerate(sys_time):
-            if (ieee[i] == avg_diff + invalid_sign or sr_v1[i] == avg_diff + invalid_sign
-                or sr_v2[i] == avg_diff + invalid_sign or dsr[i] == avg_diff + invalid_sign
-                or cdsr[i] == avg_diff + invalid_sign):
-                continue
-            idx_vicon = np.argmin(np.abs(vicon_sys_time - t))
-            f_ieee.append(ieee[i])
-            f_sr_v1.append(sr_v1[i])
-            f_sr_v2.append(sr_v2[i])
-            f_dsr.append(dsr[i])
-            f_cdsr.append(cdsr[i])
-            f_vicon.append(align_vicon[idx_vicon])
-            f_time.append(t)
-        filtered_time = np.array(f_time)
-        invalid_rate = (len(sys_time) - len(filtered_time)) / len(sys_time) * 100 if len(sys_time) > 0 else np.nan
-        return (np.array(f_ieee), np.array(f_sr_v1), np.array(f_sr_v2),
-                np.array(f_dsr), np.array(f_cdsr), np.array(f_vicon), filtered_time, invalid_rate)
 
     align_ieee = np.array(align_ieee)
     ieee_sys_time = np.array(ieee_sys_time)
@@ -296,11 +292,11 @@ def evaluation_data(align_ieee, ieee_sys_time, align_sr_v1, sr_v1_sys_time, alig
     align_vicon = np.array(align_vicon)
     vicon_sys_time = np.array(vicon_sys_time)
 
-    ieee_f, vicon_for_ieee, invalid_rate_ieee = single_valid_filter_and_metrics(align_ieee, ieee_sys_time, align_vicon, vicon_sys_time, avg_diff)
-    sr_v1_f, vicon_for_sr_v1, invalid_rate_sr_v1 = single_valid_filter_and_metrics(align_sr_v1, sr_v1_sys_time, align_vicon, vicon_sys_time, avg_diff)
-    sr_v2_f, vicon_for_sr_v2, invalid_rate_sr_v2 = single_valid_filter_and_metrics(align_sr_v2, sr_v2_sys_time, align_vicon, vicon_sys_time, avg_diff)
-    dsr_f, vicon_for_dsr, invalid_rate_dsr = single_valid_filter_and_metrics(align_dsr, dsr_sys_time, align_vicon, vicon_sys_time, avg_diff)
-    cdsr_f, vicon_for_cdsr, invalid_rate_cdsr = single_valid_filter_and_metrics(align_cdsr, cdsr_sys_time, align_vicon, vicon_sys_time, avg_diff)
+    ieee_f, vicon_for_ieee, invalid_rate_ieee = valid_filter_and_metrics(align_ieee, ieee_sys_time, align_vicon, vicon_sys_time, avg_diff)
+    sr_v1_f, vicon_for_sr_v1, invalid_rate_sr_v1 = valid_filter_and_metrics(align_sr_v1, sr_v1_sys_time, align_vicon, vicon_sys_time, avg_diff)
+    sr_v2_f, vicon_for_sr_v2, invalid_rate_sr_v2 = valid_filter_and_metrics(align_sr_v2, sr_v2_sys_time, align_vicon, vicon_sys_time, avg_diff)
+    dsr_f, vicon_for_dsr, invalid_rate_dsr = valid_filter_and_metrics(align_dsr, dsr_sys_time, align_vicon, vicon_sys_time, avg_diff)
+    cdsr_f, vicon_for_cdsr, invalid_rate_cdsr = valid_filter_and_metrics(align_cdsr, cdsr_sys_time, align_vicon, vicon_sys_time, avg_diff)
 
     mean_ae_ieee, max_ae_ieee, rmse_ieee, mre_ieee = compute_error_metrics(ieee_f, vicon_for_ieee)
     mean_ae_sr_v1, max_ae_sr_v1, rmse_sr_v1, mre_sr_v1 = compute_error_metrics(sr_v1_f, vicon_for_sr_v1)
@@ -310,8 +306,9 @@ def evaluation_data(align_ieee, ieee_sys_time, align_sr_v1, sr_v1_sys_time, alig
 
     print("==== Error metrics for all valid data ====")
     print(f"IEEE : Mean AE(平均绝对误差) = {mean_ae_ieee:.3f} cm, Max AE(最大绝对误差) = {max_ae_ieee:.3f} cm, RMSE(均方根误差) = {rmse_ieee:.3f} cm, MRE(平均相对误差) = {mre_ieee:.3f}%, Invalid Rate(计算失败率) = {invalid_rate_ieee:.2f}%")
-    print(f"SR_V1: Mean AE(平均绝对误差) = {mean_ae_sr_v1:.3f} cm, Max AE(最大绝对误差) = {max_ae_sr_v1:.3f} cm, RMSE(均方根误差) = {rmse_sr_v1:.3f} cm, MRE(平均相对误差) = {mre_sr_v1:.3f}%, Invalid Rate(计算失败率) = {invalid_rate_sr_v1:.2f}%")
-    print(f"SR_V2: Mean AE(平均绝对误差) = {mean_ae_sr_v2:.3f} cm, Max AE(最大绝对误差) = {max_ae_sr_v2:.3f} cm, RMSE(均方根误差) = {rmse_sr_v2:.3f} cm, MRE(平均相对误差) = {mre_sr_v2:.3f}%, Invalid Rate(计算失败率) = {invalid_rate_sr_v2:.2f}%")
+    # print(f"SR_V1: Mean AE(平均绝对误差) = {mean_ae_sr_v1:.3f} cm, Max AE(最大绝对误差) = {max_ae_sr_v1:.3f} cm, RMSE(均方根误差) = {rmse_sr_v1:.3f} cm, MRE(平均相对误差) = {mre_sr_v1:.3f}%, Invalid Rate(计算失败率) = {invalid_rate_sr_v1:.2f}%")
+    # print(f"SR_V2: Mean AE(平均绝对误差) = {mean_ae_sr_v2:.3f} cm, Max AE(最大绝对误差) = {max_ae_sr_v2:.3f} cm, RMSE(均方根误差) = {rmse_sr_v2:.3f} cm, MRE(平均相对误差) = {mre_sr_v2:.3f}%, Invalid Rate(计算失败率) = {invalid_rate_sr_v2:.2f}%")
+    print(f"SR: Mean AE(平均绝对误差) = {mean_ae_sr_v2:.3f} cm, Max AE(最大绝对误差) = {max_ae_sr_v2:.3f} cm, RMSE(均方根误差) = {rmse_sr_v2:.3f} cm, MRE(平均相对误差) = {mre_sr_v2:.3f}%, Invalid Rate(计算失败率) = {invalid_rate_sr_v2:.2f}%")
     print(f"DSR  : Mean AE(平均绝对误差) = {mean_ae_dsr:.3f} cm, Max AE(最大绝对误差) = {max_ae_dsr:.3f} cm, RMSE(均方根误差) = {rmse_dsr:.3f} cm, MRE(平均相对误差) = {mre_dsr:.3f}%, Invalid Rate(计算失败率) = {invalid_rate_dsr:.2f}%")
     print(f"CDSR : Mean AE(平均绝对误差) = {mean_ae_cdsr:.3f} cm, Max AE(最大绝对误差) = {max_ae_cdsr:.3f} cm, RMSE(均方根误差) = {rmse_cdsr:.3f} cm, MRE(平均相对误差) = {mre_cdsr:.3f}%, Invalid Rate(计算失败率) = {invalid_rate_cdsr:.2f}%")
 
@@ -320,10 +317,10 @@ def ranging_plot(ranging1, ranging1_sys_time, ranging2, ranging2_sys_time, rangi
     plt.plot(ranging2_sys_time, ranging2, color="#E4491E", label=name2, linestyle='--', marker='x', markersize=4, linewidth=1.5)
     plt.plot(ranging3_sys_time, ranging3, color="#FF7B00", label=name3, linestyle='--', marker='x', markersize=4, linewidth=1.5)
     plt.plot(vicon_sys_time, vicon, color="#9DF423", label='VICON', alpha=0.8, linestyle='-', marker='o', markersize=4, linewidth=1.5)
-    plt.xlabel('Time (ms)') 
-    plt.ylabel('Distance Measurement')
-    plt.title(f'{name1} vs {name2} vs VICON Distance Measurements Over Absolute Time')
-    plt.legend()
+    plt.xlabel('Time (ms)', fontsize=20) 
+    plt.ylabel('Distance Measurement',  fontsize=20)
+    plt.title(f'{name1} vs {name2} vs {name3} vs VICON Distance Measurements Over Absolute Time',  fontsize=20)
+    plt.legend(fontsize=16) 
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.tight_layout()
     plt.show()
@@ -341,10 +338,12 @@ if __name__ == '__main__':
         dsr, dsr_time, dsr_sys_time = read_dsr_log()
         cdsr, cdsr_time, cdsr_sys_time = read_cdsr_log()
         vicon, vicon_sys_time = read_vicon_log()
+
         ieee, sr_v1, sr_v2, dsr, cdsr, sys_time = write_ranging_log(ieee, ieee_sys_time, sr_v1, sr_v1_sys_time, sr_v2, sr_v2_sys_time, dsr, dsr_sys_time, cdsr, cdsr_sys_time, vicon, vicon_sys_time)
 
     align_ieee, align_sr_v1, align_sr_v2, align_dsr, align_cdsr, align_vicon, avg_diff = get_align_data(ieee, sr_v1, sr_v2, dsr, cdsr, sys_time, vicon, vicon_sys_time)
 
     evaluation_data(align_ieee, sys_time, align_sr_v1, sys_time, align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, avg_diff)
 
-    ranging_plot(align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, name1="SR_V2", name2="DSR", name3="CDSR")
+    # ranging_plot(align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, name1="SR_V2", name2="DSR", name3="CDSR")
+    ranging_plot(align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, name1="SR", name2="DSR", name3="CDSR")

@@ -17,8 +17,8 @@
 // #define IEEE_802_15_4Z
 // #define SWARM_RANGING_V1
 // #define SWARM_RANGING_V2
-// #define DYNAMIC_RANGING_MODE
-#define COMPENSATE_DYNAMIC_RANGING_MODE
+// #define DYNAMIC_RANGING
+#define COMPENSATE_DYNAMIC_RANGING
 
 #define     CHECK_POINT             2       // number of nodes queried for distance between two received messages
 #define     NODES_NUM               2       // the total number of drones in the system
@@ -27,12 +27,8 @@
 
 #if defined(IEEE_802_15_4Z) || defined(SWARM_RANGING_V1) || defined(SWARM_RANGING_V2)
 #define CLASSIC_RANGING_MODE
-#elif defined(DYNAMIC_RANGING_MODE) || defined(COMPENSATE_DYNAMIC_RANGING_MODE)
+#elif defined(DYNAMIC_RANGING) || defined(COMPENSATE_DYNAMIC_RANGING)
 #define MODIFIED_RANGING_MODE
-#endif
-
-#ifdef COMPENSATE_DYNAMIC_RANGING_MODE
-#define COMPENSATE_ENABLE
 #endif
 
 

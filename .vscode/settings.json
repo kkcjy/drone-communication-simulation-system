@@ -32,6 +32,7 @@
         "adhocuwb_platform.h": "c",
         "frame.h": "c",
         "inet.h": "c",
-        "in.h": "c"
+        "in.h": "c",
+        "adhocuwb_sniffer.h": "c"
     }
 }

@@ -23,13 +23,13 @@ The system features lightweight data processing capabilities, supports multiple 
 
 The system configures ranging modes via the `support.h` header file. Ensure only one macro definition is uncommented to avoid mode conflicts. Detailed mode descriptions are as follows:
 
-| Ranging Mode | Macro Definition | Core Features & Application Scenarios |
-|--------------|------------------|----------------------------------------|
-| IEEE 802.15.4z Standard Mode | `#define IEEE_802_15_4Z` | Complies with the IEEE 802.15.4z standard, supports UWB ranging, and provides basic high-precision ranging capabilities. |
-| Swarm Ranging V1 | `#define SWARM_RANGING_V1` | Optimized for low-latency requirements of drone swarms, uses a lightweight protocol, and is suitable for simple coordination scenarios in small-scale clusters. |
-| Swarm Ranging V2 | `#define SWARM_RANGING_V2` | An enhanced version of V1 with packet loss retransmission mechanisms and anti-interference capabilities, improving communication reliability in complex environments. Suitable for medium to large-scale clusters. |
-| Dynamic Ranging Mode | `#define DYNAMIC_RANGING_MODE` | Specifically optimized for scenarios with rapid relative movement of drones. Dynamically adjusts parameters to ensure a 0% computational failure rate, guaranteeing stable ranging under high-speed motion conditions. |
-| Compensated Dynamic Ranging Mode | `#define COMPENSATE_DYNAMIC_RANGING_MODE` | Builds upon dynamic ranging by integrating advanced motion compensation algorithms. Effectively reduces ranging lag errors caused by relative motion through prediction and real-time compensation. Ideal for high-speed drone formations and complex applications requiring precise collaborative control. |
+| Ranging Mode                     | Macro Definition                  | Core Features & Application Scenarios                                                                                                                                                                                                 |
+|----------------------------------|-----------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| IEEE 802.15.4z Standard Mode     | `#define IEEE_802_15_4Z`          | Complies with the IEEE 802.15.4z standard, supports UWB ranging, and provides basic high-precision ranging capabilities.                                                                                                               |
+| Swarm Ranging V1                 | `#define SWARM_RANGING_V1`        | Optimized for low-latency requirements of drone swarms, uses a lightweight protocol, and is suitable for simple coordination scenarios in small-scale clusters.                                                                         |
+| Swarm Ranging V2                 | `#define SWARM_RANGING_V2`        | An enhanced version of V1 with packet loss retransmission mechanisms and anti-interference capabilities, improving communication reliability in complex environments. Suitable for medium to large-scale clusters.                        |
+| Dynamic Ranging Mode             | `#define DYNAMIC_RANGING`         | Specifically optimized for scenarios with rapid relative movement of drones. Dynamically adjusts parameters to ensure a 0% computational failure rate, guaranteeing stable ranging under high-speed motion conditions.                  |
+| Compensated Dynamic Ranging Mode | `#define COMPENSATE_DYNAMIC_RANGING` | Builds upon dynamic ranging by integrating advanced motion compensation algorithms. Effectively reduces ranging lag errors caused by relative motion through prediction and real-time compensation. Ideal for high-speed drone formations and complex applications requiring precise collaborative control. |
 
 **Mode Check Command**: Execute `make mode` in the project root directory to quickly confirm the currently enabled ranging mode.
 
@@ -83,8 +83,8 @@ Example for enabling IEEE 802.15.4z mode:
 #define IEEE_802_15_4Z                       // Enable 802.15.4z mode
 // #define SWARM_RANGING_V1                  // Enable Swarm Ranging V1
 // #define SWARM_RANGING_V2                  // Enable Swarm Ranging V2
-// #define DYNAMIC_RANGING_MODE              // Enable Dynamic Ranging Mode
-// #define COMPENSATE_DYNAMIC_RANGING_MODE   // Enable Dynamic Ranging Mode
+// #define DYNAMIC_RANGING              // Enable Dynamic Ranging Mode
+// #define COMPENSATE_DYNAMIC_RANGING   // Enable Dynamic Ranging Mode
 ```
 
 #### (2) Modify Core Simulation Parameters

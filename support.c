@@ -26,9 +26,9 @@ void DEBUG_PRINT(const char *format, ...) {
     FILE *log_file = first_call ? fopen("./data/log/swarm_v1.txt", "w") : fopen("./data/log/swarm_v1.txt", "a");
     #elif defined(SWARM_RANGING_V2)
     FILE *log_file = first_call ? fopen("./data/log/swarm_v2.txt", "w") : fopen("./data/log/swarm_v2.txt", "a");
-    #elif defined(DYNAMIC_RANGING_MODE)
+    #elif defined(DYNAMIC_RANGING)
     FILE *log_file = first_call ? fopen("./data/log/dynamic.txt", "w") : fopen("./data/log/dynamic.txt", "a");
-    #elif defined(COMPENSATE_DYNAMIC_RANGING_MODE)
+    #elif defined(COMPENSATE_DYNAMIC_RANGING)
     FILE *log_file = first_call ? fopen("./data/log/compensate.txt", "w") : fopen("./data/log/compensate.txt", "a");
     #endif
 

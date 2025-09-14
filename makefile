@@ -20,8 +20,8 @@ all: $(CENTER_OUT) $(DRONE_OUT)
 IEEE_MODE_DEFINED   = $(shell grep -v '^[[:space:]]*//' $(SUPPORT_INC) | grep -q '^[[:space:]]*#define[[:space:]]*IEEE_802_15_4Z[[:space:]]*$$' && echo 1 || echo 0)
 SWARM_V1_MODE_DEFINED = $(shell grep -v '^[[:space:]]*//' $(SUPPORT_INC) | grep -q '^[[:space:]]*#define[[:space:]]*SWARM_RANGING_V1[[:space:]]*$$' && echo 1 || echo 0)
 SWARM_V2_MODE_DEFINED = $(shell grep -v '^[[:space:]]*//' $(SUPPORT_INC) | grep -q '^[[:space:]]*#define[[:space:]]*SWARM_RANGING_V2[[:space:]]*$$' && echo 1 || echo 0)
-DYNAMIC_MODE_DEFINED  = $(shell grep -v '^[[:space:]]*//' $(SUPPORT_INC) | grep -q '^[[:space:]]*#define[[:space:]]*DYNAMIC_RANGING_MODE[[:space:]]*$$' && echo 1 || echo 0)
-COMPENSATE_DYNAMIC_MODE_DEFINED  = $(shell grep -v '^[[:space:]]*//' $(SUPPORT_INC) | grep -q '^[[:space:]]*#define[[:space:]]*COMPENSATE_DYNAMIC_RANGING_MODE[[:space:]]*$$' && echo 1 || echo 0)
+DYNAMIC_MODE_DEFINED  = $(shell grep -v '^[[:space:]]*//' $(SUPPORT_INC) | grep -q '^[[:space:]]*#define[[:space:]]*DYNAMIC_RANGING[[:space:]]*$$' && echo 1 || echo 0)
+COMPENSATE_DYNAMIC_MODE_DEFINED  = $(shell grep -v '^[[:space:]]*//' $(SUPPORT_INC) | grep -q '^[[:space:]]*#define[[:space:]]*COMPENSATE_DYNAMIC_RANGING[[:space:]]*$$' && echo 1 || echo 0)
 
 MODE_COUNT = $(shell expr $(IEEE_MODE_DEFINED) + $(SWARM_V1_MODE_DEFINED) + $(SWARM_V2_MODE_DEFINED) + $(DYNAMIC_MODE_DEFINED) + $(COMPENSATE_DYNAMIC_MODE_DEFINED))
 
@@ -79,9 +79,9 @@ else ifeq ($(SWARM_V1_MODE_DEFINED),1)
 else ifeq ($(SWARM_V2_MODE_DEFINED),1)
 	@echo "Current mode: SWARM_RANGING_V2"
 else ifeq ($(DYNAMIC_MODE_DEFINED),1)
-	@echo "Current mode: DYNAMIC_RANGING_MODE"
+	@echo "Current mode: DYNAMIC_RANGING"
 else ifeq ($(COMPENSATE_DYNAMIC_MODE_DEFINED),1)
-	@echo "Current mode: COMPENSATE_DYNAMIC_RANGING_MODE"
+	@echo "Current mode: COMPENSATE_DYNAMIC_RANGING"
 endif
 
 clean:

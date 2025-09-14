@@ -33,7 +33,6 @@ def count_tx_rx_from_header(file_path):
 
         return tx_count, rx_count
 
-
 def get_drones_addr(file_path):
     search_lines = 50
     addr_set = []

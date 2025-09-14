@@ -1,4 +1,8 @@
-data/
+data/log
+data/ranging_log.csv
+data/raw_sensor_data.csv
+data/simulation_dep.csv
+data/vicon.txt
 sniffer/sniffer
 center
 drone
