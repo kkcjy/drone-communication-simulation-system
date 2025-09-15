@@ -33,7 +33,7 @@ static int csv_pos = 0;
 #define     RANGING_MODE            "CDSR"
 #endif
 
-
+#ifdef REAL_TIME_ENABLE
 int load_csv_to_memory(const char *filename) {
     FILE *fp = fopen(filename, "r");
     if (!fp) {
@@ -108,6 +108,7 @@ uint64_t get_next_RxTimestamp(uint16_t RxAddress, uint64_t RxTimestamp) {
     csv_pos = total_rows;
     return NULL_TIMESTAMP;
 }
+#endif
 
 void send_to_center(int center_socket, const char* address, const Ranging_Message_t *ranging_msg) {
     Simu_Message_t simu_msg;
@@ -185,14 +186,16 @@ void RxCallBack(int center_socket, Ranging_Message_t *rangingMessage, dwTime_t t
         
         processRangingMessage(&rangingMessageWithTimestamp);
 
-        uint64_t next_RxTimestamp = get_next_RxTimestamp((uint16_t)strtoul(localAddress, NULL, 10), timestamp.full);
-        uint64_t check_interval = ((next_RxTimestamp - timestamp.full + UWB_MAX_TIMESTAMP) % UWB_MAX_TIMESTAMP) / (CHECK_POINT + 1);
-        for(int i = 1; i <= CHECK_POINT; i++) {
-            uint64_t check_timestamp = (timestamp.full + check_interval * i) % UWB_MAX_TIMESTAMP;
-            uint16_t neighborAddress = rangingMessage->header.srcAddress;
-            int16_t distance = getDistance(neighborAddress);
-            DEBUG_PRINT("[local_%u <- neighbor_%u]: %s dist = %d, time = %llu\n", (uint16_t)strtoul(localAddress, NULL, 10), neighborAddress, RANGING_MODE, distance, check_timestamp);
-        }
+        #ifdef REAL_TIME_ENABLE
+            uint64_t next_RxTimestamp = get_next_RxTimestamp((uint16_t)strtoul(localAddress, NULL, 10), timestamp.full);
+            uint64_t check_interval = ((next_RxTimestamp - timestamp.full + UWB_MAX_TIMESTAMP) % UWB_MAX_TIMESTAMP) / (CHECK_POINT + 1);
+            for(int i = 1; i <= CHECK_POINT; i++) {
+                uint64_t check_timestamp = (timestamp.full + check_interval * i) % UWB_MAX_TIMESTAMP;
+                uint16_t neighborAddress = rangingMessage->header.srcAddress;
+                int16_t distance = getDistance(neighborAddress);
+                DEBUG_PRINT("[local_%u <- neighbor_%u]: %s dist = %d, time = %llu\n", (uint16_t)strtoul(localAddress, NULL, 10), neighborAddress, RANGING_MODE, distance, check_timestamp);
+            }
+        #endif
 
         response_to_center(center_socket, localAddress);
 
@@ -206,22 +209,24 @@ void RxCallBack(int center_socket, Ranging_Message_t *rangingMessage, dwTime_t t
 
         processDSRMessage(&rangingMessageWithAdditionalInfo);
 
-        uint16_t neighborAddress = rangingMessage->header.srcAddress;
-        uint64_t next_RxTimestamp = get_next_RxTimestamp((uint16_t)strtoul(localAddress, NULL, 10), timestamp.full);
-        if(next_RxTimestamp == NULL_TIMESTAMP) {
-            for(int i = 1; i <= CHECK_POINT; i++) {
-                double distance = getCurDistance(neighborAddress, NULL_TIMESTAMP);
-                DEBUG_PRINT("[local_%u <- neighbor_%u]: %s dist = %f, time = %llu\n", (uint16_t)strtoul(localAddress, NULL, 10), neighborAddress, RANGING_MODE, distance, timestamp.full);
+        #ifdef REAL_TIME_ENABLE
+            uint16_t neighborAddress = rangingMessage->header.srcAddress;
+            uint64_t next_RxTimestamp = get_next_RxTimestamp((uint16_t)strtoul(localAddress, NULL, 10), timestamp.full);
+            if(next_RxTimestamp == NULL_TIMESTAMP) {
+                for(int i = 1; i <= CHECK_POINT; i++) {
+                    double distance = getCurDistance(neighborAddress, NULL_TIMESTAMP);
+                    DEBUG_PRINT("[local_%u <- neighbor_%u]: %s dist = %f, time = %llu\n", (uint16_t)strtoul(localAddress, NULL, 10), neighborAddress, RANGING_MODE, distance, timestamp.full);
+                }
             }
-        }
-        else {
-            uint64_t check_interval = ((next_RxTimestamp - timestamp.full + UWB_MAX_TIMESTAMP) % UWB_MAX_TIMESTAMP) / (CHECK_POINT + 1);
-            for(int i = 1; i <= CHECK_POINT; i++) {
-                uint64_t check_timestamp = (timestamp.full + check_interval * i) % UWB_MAX_TIMESTAMP;
-                double distance = getCurDistance(neighborAddress, check_timestamp);
-                DEBUG_PRINT("[local_%u <- neighbor_%u]: %s dist = %f, time = %llu\n", (uint16_t)strtoul(localAddress, NULL, 10), neighborAddress, RANGING_MODE, distance, check_timestamp);
+            else {
+                uint64_t check_interval = ((next_RxTimestamp - timestamp.full + UWB_MAX_TIMESTAMP) % UWB_MAX_TIMESTAMP) / (CHECK_POINT + 1);
+                for(int i = 1; i <= CHECK_POINT; i++) {
+                    uint64_t check_timestamp = (timestamp.full + check_interval * i) % UWB_MAX_TIMESTAMP;
+                    double distance = getCurDistance(neighborAddress, check_timestamp);
+                    DEBUG_PRINT("[local_%u <- neighbor_%u]: %s dist = %f, time = %llu\n", (uint16_t)strtoul(localAddress, NULL, 10), neighborAddress, RANGING_MODE, distance, check_timestamp);
+                }
             }
-        }
+        #endif
 
         response_to_center(center_socket, localAddress);
 
@@ -292,10 +297,12 @@ int main(int argc, char *argv[]) {
     TxTimestamp.full = 0;
     RxTimestamp.full = 0;
 
-    if (load_csv_to_memory("data/simulation_dep.csv") <= 0) {
-        printf("Failed to load CSV\n");
-        return 1;
-    }
+    #ifdef REAL_TIME_ENABLE
+        if (load_csv_to_memory("data/simulation_dep.csv") <= 0) {
+            printf("Failed to load CSV\n");
+            return 1;
+        }
+    #endif
 
     #if defined(CLASSIC_RANGING_MODE)
         rangingTableSetInit(&rangingTableSet);
@@ -306,7 +313,6 @@ int main(int argc, char *argv[]) {
     int center_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (center_socket < 0) {
         perror("Socket creation error");
-        free_csv_memory();
         return -1;
     }
 
@@ -318,14 +324,12 @@ int main(int argc, char *argv[]) {
     if (inet_pton(AF_INET, center_ip, &serv_addr.sin_addr) <= 0) {
         perror("Invalid address");
         close(center_socket); 
-        free_csv_memory();
         return -1;
     }
 
     if (connect(center_socket, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
         perror("Connection Failed");
         close(center_socket); 
-        free_csv_memory();
         return -1;
     }
 
@@ -337,7 +341,6 @@ int main(int argc, char *argv[]) {
     if (pthread_create(&receive_thread, NULL, receive_from_center, &center_socket) != 0) {
         perror("Failed to create receive thread");
         close(center_socket);
-        free_csv_memory();
         return -1;
     }
 
@@ -346,7 +349,9 @@ int main(int argc, char *argv[]) {
     pthread_join(receive_thread, NULL);
     close(center_socket);
 
-    free_csv_memory();
+    #ifdef REAL_TIME_ENABLE
+        free_csv_memory();
+    #endif
 
     return 0;
 }

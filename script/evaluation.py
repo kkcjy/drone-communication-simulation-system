@@ -12,6 +12,7 @@ matplotlib.use('TkAgg')
 
 # Set the active address and use the target address’s time range as the alignment reference
 RESULT_REPRODUCTION = False
+REAL_TIME_ENABLE = False
 CHECK_POINT = 2
 local_address = 2
 neighbor_address = 3
@@ -36,33 +37,51 @@ output_path = "../data/ranging_log.csv"
 
 
 def align_sys_time(time_list):
-    sys_time = []
-    rx_time = []
-    align_sys_time = []
-    with open(sys_path, 'r', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            if int(row['Rx0_addr']) == local_address:
+    if REAL_TIME_ENABLE:
+        sys_time = []
+        rx_time = []
+        align_sys_time = []
+        with open(sys_path, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if int(row['Rx0_addr']) == local_address:
+                    sys_time.append(int(row['system_time']))
+                    rx_time.append(int(row['Rx0_time']))
+        index = 0
+        check_interval = 0
+        length = len(time_list)
+        for i in range(len(rx_time)):
+            if rx_time[i] == time_list[index]:
+                align_sys_time.append(sys_time[i])
+                if index < length - CHECK_POINT - 1:
+                    check_interval = (sys_time[i + 1] - sys_time[i]) / (CHECK_POINT + 1)
+                    for j in range(1, CHECK_POINT + 1):
+                        align_sys_time.append(sys_time[i] + check_interval * j)
+                else:
+                    for j in range(1, CHECK_POINT + 1):
+                        align_sys_time.append(sys_time[i] + check_interval * j)
+                    break
+                index += CHECK_POINT + 1
+        return align_sys_time
+    
+    else:
+        sys_time = []
+        rx_time = []
+        align_sys_time = []
+        with open(sys_path, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
                 sys_time.append(int(row['system_time']))
                 rx_time.append(int(row['Rx0_time']))
-
-    index = 0
-    check_interval = 0
-    length = len(time_list)
-    for i in range(len(rx_time)):
-        if rx_time[i] == time_list[index]:
-            align_sys_time.append(sys_time[i])
-            if index < length - CHECK_POINT - 1:
-                check_interval = (sys_time[i + 1] - sys_time[i]) / (CHECK_POINT + 1)
-                for j in range(1, CHECK_POINT + 1):
-                    align_sys_time.append(sys_time[i] + check_interval * j)
-            else:
-                for j in range(1, CHECK_POINT + 1):
-                    align_sys_time.append(sys_time[i] + check_interval * j)
+        index = 0
+        length = len(time_list)
+        for i in range(len(rx_time)):
+            if index >= length:
                 break
-            index += 3
-        
-    return align_sys_time
+            if rx_time[i] == time_list[index]:
+                align_sys_time.append(sys_time[i])
+                index += 1
+        return align_sys_time
 
 def read_ieee_log():
     ieee_value = []
@@ -194,8 +213,8 @@ def write_ranging_log(ieee, ieee_sys_time, sr_v1, sr_v1_sys_time, sr_v2, sr_v2_s
 
         count = 0
         for t in common_time:
-            if invalid_ignore and (ieee[ieee_idx[t]] == invalid_sign and sr_v1[sr_v1_idx[t]] == invalid_sign and sr_v2[sr_v2_idx[t]] == invalid_sign
-                                   and dsr[dsr_idx[t]] == invalid_sign and cdsr[cdsr_idx[t]] == invalid_sign):
+            if invalid_ignore and (ieee[ieee_idx[t]] == invalid_sign or sr_v1[sr_v1_idx[t]] == invalid_sign or sr_v2[sr_v2_idx[t]] == invalid_sign
+                                   or dsr[dsr_idx[t]] == invalid_sign or cdsr[cdsr_idx[t]] == invalid_sign):
                 continue
             else:
                 invalid_ignore = False
@@ -348,4 +367,4 @@ if __name__ == '__main__':
     evaluation_data(align_ieee, sys_time, align_sr_v1, sys_time, align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, avg_diff)
 
     # ranging_plot(align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, name1="SR_V2", name2="DSR", name3="CDSR")
-    ranging_plot(align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, name1="SR", name2="DSR", name3="CDSR")
+    ranging_plot(align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, name1="SR", name2="IC-DSR", name3="IC-DSR + DS-REC")
