@@ -346,7 +346,7 @@ def ranging_plot(ranging1, ranging1_sys_time, ranging2, ranging2_sys_time, rangi
     plt.tight_layout()
     plt.show()
 
-def error_histogram(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time, name1="SR", name2="IC-DSR", name3="IC-DSR + DS-REC", bins=12):
+def error_histogram(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time, name1="SR", name2="IC-DSR", name3="IC-DSR + DS-REC", bin_width=2, max_range=24):
     def get_error_for_hist(align_data, sys_time, align_vicon, vicon_sys_time):
         filtered, vicon_for_data = [], []
         for i, t in enumerate(sys_time):
@@ -359,25 +359,27 @@ def error_histogram(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, v
         return err
 
     err1 = get_error_for_hist(align_sr_v2, sys_time, align_vicon, vicon_sys_time)
-    err2 = get_error_for_hist(align_dsr,   sys_time, align_vicon, vicon_sys_time)
-    err3 = get_error_for_hist(align_cdsr,  sys_time, align_vicon, vicon_sys_time)
+    err2 = get_error_for_hist(align_dsr, sys_time, align_vicon, vicon_sys_time)
+    err3 = get_error_for_hist(align_cdsr, sys_time, align_vicon, vicon_sys_time)
 
-    data_all = np.concatenate([err1, err2, err3])
-    counts, bin_edges = np.histogram(data_all, bins=bins)
+    bins = np.arange(0, max_range + bin_width, bin_width)
+    hist1, _ = np.histogram(err1, bins=bins)
+    hist2, _ = np.histogram(err2, bins=bins)
+    hist3, _ = np.histogram(err3, bins=bins)
 
-    hist1, _ = np.histogram(err1, bins=bin_edges)
-    hist2, _ = np.histogram(err2, bins=bin_edges)
-    hist3, _ = np.histogram(err3, bins=bin_edges)
     hist1 = hist1 / len(err1) * 100
     hist2 = hist2 / len(err2) * 100
     hist3 = hist3 / len(err3) * 100
 
-    width = (bin_edges[1] - bin_edges[0]) / 4
-
+    width = bin_width / 4
     plt.figure(figsize=(8, 6))
-    plt.bar(bin_edges[:-1], hist1, width=width, align="edge", alpha=0.8, label=name1)
-    plt.bar(bin_edges[:-1] + width, hist2, width=width, align="edge", alpha=0.8, label=name2)
-    plt.bar(bin_edges[:-1] + 2*width, hist3, width=width, align="edge", alpha=0.8, label=name3)
+    plt.bar(bins[:-1], hist1, width=width, align="edge", alpha=0.8, label=name1)
+    plt.bar(bins[:-1] + width, hist2, width=width, align="edge", alpha=0.8, label=name2)
+    plt.bar(bins[:-1] + 2*width, hist3, width=width, align="edge", alpha=0.8, label=name3)
+
+    tick_positions = bins[:-1] + 1.5 * width  
+    tick_labels = [f"{b}-{b + bin_width}" for b in bins[:-1]] 
+    plt.xticks(tick_positions, tick_labels, fontsize=12)
 
     plt.xlabel("Absolute Error (cm)", fontsize=35, labelpad=35)
     plt.ylabel("Percentage (%)", fontsize=35, labelpad=35)
@@ -411,4 +413,4 @@ if __name__ == '__main__':
 
     # ranging_plot(align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, name1="SR", name2="IC-DSR", name3="IC-DSR + DS-REC")
 
-    error_histogram(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time, name1="SR", name2="IC-DSR", name3="IC-DSR + DS-REC", bins=12)
+    error_histogram(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time, name1="SR", name2="IC-DSR", name3="IC-DSR + DS-REC")
