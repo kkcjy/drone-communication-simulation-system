@@ -346,6 +346,38 @@ def ranging_plot(ranging1, ranging1_sys_time, ranging2, ranging2_sys_time, rangi
     plt.tight_layout()
     plt.show()
 
+def evaluation_error(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time, bin_width=2, max_range=20):
+    def get_error_for_eval(align_data, sys_time, align_vicon, vicon_sys_time):
+        filtered, vicon_for_data = [], []
+        for i, t in enumerate(sys_time):
+            idx = np.argmin(np.abs(vicon_sys_time - t))
+            filtered.append(align_data[i])
+            vicon_for_data.append(align_vicon[idx])
+        filtered = np.array(filtered)
+        vicon_for_data = np.array(vicon_for_data)
+        err = np.abs(filtered - vicon_for_data)
+        return err
+
+    err1 = get_error_for_eval(align_sr_v2, sys_time, align_vicon, vicon_sys_time)
+    err2 = get_error_for_eval(align_dsr, sys_time, align_vicon, vicon_sys_time)
+    err3 = get_error_for_eval(align_cdsr, sys_time, align_vicon, vicon_sys_time)
+
+    bins = np.arange(bin_width, max_range + bin_width, bin_width)
+
+    def calc_cdf(err, bins):
+        cdf = []
+        for b in bins:
+            cdf.append(np.sum(err <= b) / len(err) * 100)
+        return np.array(cdf)
+
+    cdf_sr = calc_cdf(err1, bins)
+    cdf_dsr = calc_cdf(err2, bins)
+    cdf_cdsr = calc_cdf(err3, bins)
+
+    print(f"{'Threshold (cm)':<15}{'SR':>12}{'IC-DSR':>12}{'IC-DSR+DS-REC':>18}")
+    for i, b in enumerate(bins):
+        print(f"{b:<15}{cdf_sr[i]:>12.2f}{cdf_dsr[i]:>12.2f}{cdf_cdsr[i]:>18.2f}")
+
 def error_histogram(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time, name1="SR", name2="IC-DSR", name3="IC-DSR + DS-REC", bin_width=2, max_range=20):
     def get_error_for_hist(align_data, sys_time, align_vicon, vicon_sys_time):
         filtered, vicon_for_data = [], []
@@ -412,5 +444,7 @@ if __name__ == '__main__':
     evaluation_data(align_ieee, sys_time, align_sr_v1, sys_time, align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, avg_diff)
 
     # ranging_plot(align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, name1="SR", name2="IC-DSR", name3="IC-DSR + DS-REC")
+
+    evaluation_error(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time)
 
     error_histogram(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time, name1="SR", name2="IC-DSR", name3="IC-DSR + DS-REC")
