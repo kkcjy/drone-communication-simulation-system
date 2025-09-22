@@ -346,6 +346,47 @@ def ranging_plot(ranging1, ranging1_sys_time, ranging2, ranging2_sys_time, rangi
     plt.tight_layout()
     plt.show()
 
+def error_histogram(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time, name1="SR", name2="IC-DSR", name3="IC-DSR + DS-REC", bins=12):
+    def get_error_for_hist(align_data, sys_time, align_vicon, vicon_sys_time):
+        filtered, vicon_for_data = [], []
+        for i, t in enumerate(sys_time):
+            idx = np.argmin(np.abs(vicon_sys_time - t))
+            filtered.append(align_data[i])
+            vicon_for_data.append(align_vicon[idx])
+        filtered = np.array(filtered)
+        vicon_for_data = np.array(vicon_for_data)
+        err = np.abs(filtered - vicon_for_data)
+        return err
+
+    err1 = get_error_for_hist(align_sr_v2, sys_time, align_vicon, vicon_sys_time)
+    err2 = get_error_for_hist(align_dsr,   sys_time, align_vicon, vicon_sys_time)
+    err3 = get_error_for_hist(align_cdsr,  sys_time, align_vicon, vicon_sys_time)
+
+    data_all = np.concatenate([err1, err2, err3])
+    counts, bin_edges = np.histogram(data_all, bins=bins)
+
+    hist1, _ = np.histogram(err1, bins=bin_edges)
+    hist2, _ = np.histogram(err2, bins=bin_edges)
+    hist3, _ = np.histogram(err3, bins=bin_edges)
+    hist1 = hist1 / len(err1) * 100
+    hist2 = hist2 / len(err2) * 100
+    hist3 = hist3 / len(err3) * 100
+
+    width = (bin_edges[1] - bin_edges[0]) / 4
+
+    plt.figure(figsize=(8, 6))
+    plt.bar(bin_edges[:-1], hist1, width=width, align="edge", alpha=0.8, label=name1)
+    plt.bar(bin_edges[:-1] + width, hist2, width=width, align="edge", alpha=0.8, label=name2)
+    plt.bar(bin_edges[:-1] + 2*width, hist3, width=width, align="edge", alpha=0.8, label=name3)
+
+    plt.xlabel("Absolute Error (cm)", fontsize=35, labelpad=35)
+    plt.ylabel("Percentage (%)", fontsize=35, labelpad=35)
+    plt.title("Error Distribution Histogram", fontsize=32, pad=40)
+    plt.legend(fontsize=25)
+    plt.grid(True, linestyle="--", alpha=0.7)
+    plt.tight_layout()
+    plt.show()
+
 
 if __name__ == '__main__':
     if RESULT_REPRODUCTION:
@@ -366,5 +407,6 @@ if __name__ == '__main__':
 
     evaluation_data(align_ieee, sys_time, align_sr_v1, sys_time, align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, avg_diff)
 
-    # ranging_plot(align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, name1="SR_V2", name2="DSR", name3="CDSR")
-    ranging_plot(align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, name1="SR", name2="IC-DSR", name3="IC-DSR + DS-REC")
+    # ranging_plot(align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, name1="SR", name2="IC-DSR", name3="IC-DSR + DS-REC")
+
+    error_histogram(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time, name1="SR", name2="IC-DSR", name3="IC-DSR + DS-REC", bins=12)

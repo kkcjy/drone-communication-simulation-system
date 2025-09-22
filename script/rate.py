@@ -70,7 +70,7 @@ def plot_rate_histogram(rates, bar_cmap='viridis', edge_color="white",
     plt.show()
 
 if __name__ == "__main__":
-    filename = "../data/log/rate.txt"
+    filename = "../data/log_real/rate.txt"
     rates = extract_rates(filename)
     if rates:
         print(f"Extracted {len(rates)} rate values.")
