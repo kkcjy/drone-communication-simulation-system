@@ -382,6 +382,8 @@ def error_histogram(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, v
     plt.xlabel("Absolute Error (cm)", fontsize=35, labelpad=35)
     plt.ylabel("Percentage (%)", fontsize=35, labelpad=35)
     plt.title("Error Distribution Histogram", fontsize=32, pad=40)
+    plt.xticks(fontsize=30)
+    plt.yticks(fontsize=30) 
     plt.legend(fontsize=25)
     plt.grid(True, linestyle="--", alpha=0.7)
     plt.tight_layout()
