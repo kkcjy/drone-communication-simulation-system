@@ -346,7 +346,7 @@ def ranging_plot(ranging1, ranging1_sys_time, ranging2, ranging2_sys_time, rangi
     plt.tight_layout()
     plt.show()
 
-def error_histogram(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time, name1="SR", name2="IC-DSR", name3="IC-DSR + DS-REC", bin_width=2, max_range=24):
+def error_histogram(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time, name1="SR", name2="IC-DSR", name3="IC-DSR + DS-REC", bin_width=2, max_range=20):
     def get_error_for_hist(align_data, sys_time, align_vicon, vicon_sys_time):
         filtered, vicon_for_data = [], []
         for i, t in enumerate(sys_time):
