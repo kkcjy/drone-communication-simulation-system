@@ -346,6 +346,38 @@ def ranging_plot(ranging1, ranging1_sys_time, ranging2, ranging2_sys_time, rangi
     plt.tight_layout()
     plt.show()
 
+def evaluation_relative_move(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time, left, right):
+    aligned_vicon = np.zeros_like(sys_time, dtype=float)
+    for i, t in enumerate(sys_time):
+        idx = np.argmin(np.abs(vicon_sys_time - t))
+        aligned_vicon[i] = align_vicon[idx]
+
+    mask = (sys_time >= left) & (sys_time <= right)
+    if not np.any(mask):
+        return None
+
+    sr = align_sr_v2[mask]
+    dsr = align_dsr[mask]
+    cdsr = align_cdsr[mask]
+    vicon = aligned_vicon[mask]
+
+    def compute_error_metrics(predicted, ground_truth):
+        ae = np.abs(predicted - ground_truth)
+        mean_ae = np.mean(ae)
+        max_ae = np.max(ae)
+        rmse = np.sqrt(np.mean((predicted - ground_truth) ** 2))
+        mre = np.mean(ae / np.maximum(ground_truth, 1e-6)) * 100
+        return mean_ae, max_ae, rmse, mre
+
+    mean_ae_sr, max_ae_sr, rmse_sr, mre_sr = compute_error_metrics(sr, vicon)
+    mean_ae_dsr, max_ae_dsr, rmse_dsr, mre_dsr = compute_error_metrics(dsr, vicon)
+    mean_ae_cdsr, max_ae_cdsr, rmse_cdsr, mre_cdsr = compute_error_metrics(cdsr, vicon)
+
+    print(f"\n==== Relative Move Error in Range [{left}, {right}], length = {len(vicon)} ====")
+    print(f"SR   : Mean AE = {mean_ae_sr:.3f} cm, Max AE = {max_ae_sr:.3f} cm, RMSE = {rmse_sr:.3f} cm, MRE = {mre_sr:.3f}%")
+    print(f"DSR  : Mean AE = {mean_ae_dsr:.3f} cm, Max AE = {max_ae_dsr:.3f} cm, RMSE = {rmse_dsr:.3f} cm, MRE = {mre_dsr:.3f}%")
+    print(f"CDSR : Mean AE = {mean_ae_cdsr:.3f} cm, Max AE = {max_ae_cdsr:.3f} cm, RMSE = {rmse_cdsr:.3f} cm, MRE = {mre_cdsr:.3f}%")
+
 def evaluation_error(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time, bin_width=2, max_range=20):
     def get_error_for_eval(align_data, sys_time, align_vicon, vicon_sys_time):
         filtered, vicon_for_data = [], []
@@ -374,11 +406,11 @@ def evaluation_error(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, 
     cdf_dsr = calc_cdf(err2, bins)
     cdf_cdsr = calc_cdf(err3, bins)
 
-    print(f"{'Threshold (cm)':<15}{'SR':>12}{'IC-DSR':>12}{'IC-DSR+DS-REC':>18}")
+    print(f"\n{'Threshold (cm)':<15}{'SR':>12}{'IC-DSR':>12}{'IC-DSR+DS-REC':>18}")
     for i, b in enumerate(bins):
         print(f"{b:<15}{cdf_sr[i]:>12.2f}{cdf_dsr[i]:>12.2f}{cdf_cdsr[i]:>18.2f}")
 
-def error_histogram(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time, name1="SR", name2="IC-DSR", name3="IC-DSR + DS-REC", bin_width=2, max_range=20):
+def error_histogram_plot(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time, name1="SR", name2="IC-DSR", name3="IC-DSR + DS-REC", bin_width=2, max_range=20):
     def get_error_for_hist(align_data, sys_time, align_vicon, vicon_sys_time):
         filtered, vicon_for_data = [], []
         for i, t in enumerate(sys_time):
@@ -443,8 +475,10 @@ if __name__ == '__main__':
 
     evaluation_data(align_ieee, sys_time, align_sr_v1, sys_time, align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, avg_diff)
 
-    # ranging_plot(align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, name1="SR", name2="IC-DSR", name3="IC-DSR + DS-REC")
+    ranging_plot(align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, name1="SR", name2="IC-DSR", name3="IC-DSR + DS-REC")
+
+    evaluation_relative_move(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time, left = 1537080, right = 1538579)
 
     evaluation_error(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time)
 
-    error_histogram(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time, name1="SR", name2="IC-DSR", name3="IC-DSR + DS-REC")
+    # error_histogram_plot(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time, name1="SR", name2="IC-DSR", name3="IC-DSR + DS-REC")
