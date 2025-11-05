@@ -12,7 +12,7 @@ matplotlib.use('TkAgg')
 
 # Set the active address and use the target address’s time range as the alignment reference
 RESULT_REPRODUCTION = False
-REAL_TIME_ENABLE = False
+REAL_TIME_ENABLE = True
 CHECK_POINT = 2
 local_address = 2
 neighbor_address = 3
@@ -27,11 +27,11 @@ rightbound = 1423480
 invalid_sign = -1
 
 sys_path = "../data/simulation_dep.csv"
-ieee_path = "../data/log/ieee.txt"
-sr_v1_path = "../data/log/swarm_v1.txt"
-sr_v2_path = "../data/log/swarm_v2.txt"
-dsr_path = "../data/log/dynamic.txt"
-cdsr_path = "../data/log/compensate.txt"
+ieee_path = "../data/log_real/ieee.txt"
+sr_v1_path = "../data/log_real/swarm_v1.txt"
+sr_v2_path = "../data/log_real/swarm_v2.txt"
+dsr_path = "../data/log_real/dynamic.txt"
+cdsr_path = "../data/log_real/compensate.txt"
 vicon_path = "../data/vicon.txt"
 output_path = "../data/ranging_log.csv"
 
@@ -331,13 +331,44 @@ def evaluation_data(align_ieee, ieee_sys_time, align_sr_v1, sr_v1_sys_time, alig
     print(f"DSR  : Mean AE(平均绝对误差) = {mean_ae_dsr:.3f} cm, Max AE(最大绝对误差) = {max_ae_dsr:.3f} cm, RMSE(均方根误差) = {rmse_dsr:.3f} cm, MRE(平均相对误差) = {mre_dsr:.3f}%, Invalid Rate(计算失败率) = {invalid_rate_dsr:.2f}%")
     print(f"CDSR : Mean AE(平均绝对误差) = {mean_ae_cdsr:.3f} cm, Max AE(最大绝对误差) = {max_ae_cdsr:.3f} cm, RMSE(均方根误差) = {rmse_cdsr:.3f} cm, MRE(平均相对误差) = {mre_cdsr:.3f}%, Invalid Rate(计算失败率) = {invalid_rate_cdsr:.2f}%")
 
+def sr_vicon_plot(sr, sr_sys_time, vicon, vicon_sys_time, sr_name="SR"):
+    plt.plot(sr_sys_time, sr, color="#E4491E", label=sr_name, linestyle='--', marker='x', markersize=8, linewidth=2.4)
+    plt.plot(vicon_sys_time, vicon, color="#9DF423", label='VICON', alpha=0.9, linestyle='-', marker='o', markersize=8, linewidth=2.4)
+    
+    plt.xlabel('Time (ms)', fontsize=45, labelpad=45)
+    plt.ylabel('Distance (cm)', fontsize=45, labelpad=45)
+    plt.title(f'{sr_name} vs VICON Distance Measurements', fontsize=42, pad=50)
+    
+    plt.xticks(fontsize=40)
+    plt.yticks(fontsize=40)
+    plt.legend(fontsize=35)
+    plt.grid(True, linestyle='--', alpha=0.8)
+    plt.tight_layout()
+    plt.show()
+
+def dsr_sr_vicon_plot(dsr, sr, sys_time, align_vicon, vicon_sys_time):
+    plt.plot(sys_time, sr, color="#4A90E2", label='SR', linestyle='--', marker='x', markersize=8, linewidth=2.4)
+    plt.plot(sys_time, dsr, color="#FF7B00", label='DSR', linestyle='--', marker='x', markersize=8, linewidth=2.4)
+    plt.plot(vicon_sys_time, align_vicon, color="#9DF423", label='VICON', alpha=0.9, linestyle='-', marker='o', markersize=8, linewidth=2.4)
+    
+    plt.xlabel('Time (ms)', fontsize=45, labelpad=45)
+    plt.ylabel('Distance (cm)', fontsize=45, labelpad=45)
+    plt.title(f'SR vs DSR vs VICON Distance Measurements', fontsize=42, pad=50)
+    
+    plt.xticks(fontsize=40)
+    plt.yticks(fontsize=40)
+    plt.legend(fontsize=35)
+    plt.grid(True, linestyle='--', alpha=0.8)
+    plt.tight_layout()
+    plt.show()
+
 def ranging_plot(ranging1, ranging1_sys_time, ranging2, ranging2_sys_time, ranging3, ranging3_sys_time, vicon, vicon_sys_time, name1="RANGING1", name2="RANGING2", name3="RANGING3"):
     plt.plot(ranging1_sys_time, ranging1, color='#4A90E2', label=name1, linestyle='--', marker='x', markersize=6, linewidth=1.8)
     plt.plot(ranging2_sys_time, ranging2, color="#E4491E", label=name2, linestyle='--', marker='x', markersize=6, linewidth=1.8)
     plt.plot(ranging3_sys_time, ranging3, color="#FF7B00", label=name3, linestyle='--', marker='x', markersize=6, linewidth=1.8)
     plt.plot(vicon_sys_time, vicon, color="#9DF423", label='VICON', alpha=0.8, linestyle='-', marker='o', markersize=6, linewidth=1.8)
     plt.xlabel('Time (ms)', fontsize=35, labelpad=35) 
-    plt.ylabel('Distance', fontsize=35, labelpad=35)
+    plt.ylabel('Distance (cm)', fontsize=35, labelpad=35)
     plt.title(f'{name1} vs {name2} vs {name3} vs VICON Distance Measurements', fontsize=32, pad=40)
     plt.xticks(fontsize=30)
     plt.yticks(fontsize=30) 
@@ -475,10 +506,14 @@ if __name__ == '__main__':
 
     evaluation_data(align_ieee, sys_time, align_sr_v1, sys_time, align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, avg_diff)
 
-    ranging_plot(align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, name1="SR", name2="IC-DSR", name3="IC-DSR + DS-REC")
+    # sr_vicon_plot(align_sr_v2, sys_time, align_vicon, vicon_sys_time, sr_name="SR")
 
-    evaluation_relative_move(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time, left = 1537080, right = 1538579)
+    dsr_sr_vicon_plot(align_cdsr, align_sr_v2, sys_time, align_vicon, vicon_sys_time)
 
-    evaluation_error(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time)
+    # ranging_plot(align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, name1="SR", name2="IC-DSR", name3="IC-DSR + DS-REC")
+
+    # evaluation_relative_move(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time, left = 1537080, right = 1538579)
+
+    # evaluation_error(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time)
 
     # error_histogram_plot(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time, name1="SR", name2="IC-DSR", name3="IC-DSR + DS-REC")

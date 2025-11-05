@@ -41,16 +41,17 @@ The system configures ranging modes via the `support.h` header file. Ensure only
 Acquire two types of core data (positioning + packet data) and ensure global consistency of drone addresses (subsequent steps rely on address-based data association).
 
 #### (1) Address Pre-configuration (Critical Prerequisite)
-- In `cfclient` (drone configuration tool), set a unique numeric address (e.g., 1, 2, 3; 0 is prohibited) for each drone.
-- When creating drone rigid bodies in the VICON system, use naming consistent with `cfclient` addresses (e.g., "drone_1", "drone_2") to ensure unambiguous data association.
+- In `cfclient` (drone configuration tool), set a unique numeric address (e.g., 1, 2, 3; **0 is prohibited**) for each drone.
+- When creating drone rigid bodies in the VICON system, use naming consistent with `cfclient` addresses (e.g., 1, 2, 3) to ensure unambiguous data association.
+- You need to modify the `mc = motioncapture.connect` section in the `vicon.py` script. Make sure that the Vicon system and the host connected to the sniffer are on the same local network.
 
 #### (2) VICON Positioning Data Acquisition
-- Run the `vicon.py` script, which first scans for drone rigid bodies in the environment and lists identified nodes (e.g., "drone_1, drone_2").
-- After manual confirmation, the script records real-time coordinates and inter-node distances, generating `vicon.txt` in the project root directory.
+- Run the `vicon.py` script, which first scans for drone rigid bodies in the environment and lists identified nodes (e.g., 1, 2, 3).
+- After manual confirmation, the script records real-time coordinates and inter-node distances, generating `data/vicon.txt`.
 
 #### (3) Sniffer Packet Data Acquisition
-- Enter the `sniffer` folder and run the monitoring script (e.g., `sniff.sh`), which initially ignores the first 30-50 packets to filter USB transmission interference.
-- Upon completion, `raw_sensor_data.csv` is generated in `sniffer/data/`, containing raw communication packets (source address, destination address, transmission timestamp, etc.).
+- Enter the `sniffer` folder and run the executable `sniffer` (compile `sniffer.c` first). The script initially ignores the first 30–50 packets to filter out USB transmission interference.
+- After execution, a file `data/raw_sensor_data.csv` is generated, which contains the raw communication packets (source address, destination address, transmission timestamp, etc.).
 
 ### 2. Data Preparation and Processing
 
@@ -59,7 +60,6 @@ Convert raw data to a standard format readable by the simulation system using `d
 #### (1) Parameter Configuration
 Open `data_process.py` and modify:
 - `DRONE_NUM`: Number of simulated drones (exclude the Sniffer device, count only communicating drones).
-- (Optional) `DATA_PATH`: Update if the raw CSV path changes (defaults to `sniffer/data/raw_sensor_data.csv`).
 
 #### (2) Execute Data Processing
 ```bash
