@@ -1,18 +1,14 @@
 import re
 import numpy as np
-import matplotlib
 import matplotlib.pyplot as plt
-matplotlib.use('TkAgg') 
-
-plt.rcParams['font.family'] = 'DejaVu Sans'
-plt.rcParams['font.size'] = 28
-plt.rcParams['axes.linewidth'] = 3.0
+from scipy.stats import gaussian_kde
+from matplotlib.ticker import PercentFormatter
 
 def extract_rates(filename):
     try:
         with open(filename, 'r', encoding='utf-8') as f:
             content = f.read()
-            pattern = r'rate\s*=\s*(\d+\.\d+)'
+            pattern = r'rate\s*=\s*([\d\.]+)'
             matches = re.findall(pattern, content)
             rates = [float(x) for x in matches]
             if not rates:
@@ -23,65 +19,53 @@ def extract_rates(filename):
         print(f"Error reading file: {e}")
         return None
 
-def plot_rate_histogram(rates, bar_cmap='viridis', edge_color="white", 
-                        avg_line_color='#FF6B6B', shade=0.7, text_color='#2a2a2a'):
+def error_hill_plot(rates):
     rates_array = np.array(rates)
-    average = np.mean(rates_array)
-    std_dev = np.std(rates_array)
-    
-    fig, ax = plt.subplots(figsize=(18, 14))
-    
-    counts, bins, patches = plt.hist(rates_array, bins=20, edgecolor=edge_color, 
-                                    linewidth=5.0, alpha=0.9, density=False)
-    
-    cmap = plt.colormaps[bar_cmap]
-    norm = matplotlib.colors.Normalize(vmin=min(counts), vmax=max(counts))
-    for count, patch in zip(counts, patches):
-        patch.set_facecolor(cmap(norm(count) * shade))
-    
-    plt.axvline(average, color=avg_line_color, linestyle='-.', linewidth=5, 
-                alpha=0.9, label=f'Mean = {average:.4f} ± {std_dev:.4f}')
-    
-    for count, bin_edge in zip(counts, bins):
-        if count > 0:
-            plt.text(bin_edge + (bins[1]-bins[0])/2, count + max(counts)*0.01, 
-                     f'{int(count)}', ha='center', va='bottom', 
-                     fontsize=35)
-    
-    ax.spines[['top', 'right']].set_visible(False)
-    ax.spines[['left', 'bottom']].set_color(text_color)
-    ax.tick_params(colors=text_color, labelsize=30)
-    
-    plt.title("Compensation Factor Distribution", fontsize=48, pad=40)
-    plt.xlabel("Compensation Factor Value", fontsize=40, labelpad=30)
-    plt.ylabel("Frequency", fontsize=40, labelpad=30)
-    
-    ax.grid(True, alpha=0.3, linestyle='--', color='#666666')
-    
-    legend = plt.legend(frameon=True, fancybox=True, shadow=True, framealpha=0.95, fontsize=35, loc='upper right')
-    legend.get_frame().set_edgecolor('#444444')
-    legend.get_frame().set_linewidth(3.0)
-    legend.get_frame().set_facecolor('#f8f8f8')
-    
-    ax.set_facecolor('#fafafa')
-    fig.patch.set_facecolor('#ffffff')
-    
+    mean = np.mean(rates_array)
+    std = np.std(rates_array)
+
+    main_color = '#ffc0b7'    # KDE 曲线 + ±1σ 填充
+    sigma_color = "#e3ad78"   # ±1σ 区域填充
+    mean_color = "#a792c9"    # 均值标记
+
+    xs_min = max(0, mean - 3*std)
+    xs_max = mean + 3*std
+    xs = np.linspace(xs_min, xs_max, 400)
+
+    kde = gaussian_kde(rates_array)
+    y = kde(xs)
+
+    plt.figure(figsize=(10, 6))
+    # 整体曲线下方填充
+    plt.fill_between(xs, 0, y, color=main_color, alpha=0.2)
+    # ±1σ 区域填充
+    plt.fill_between(xs, 0, y, where=(xs >= mean - std) & (xs <= mean + std),
+                     color=sigma_color, alpha=0.4, label=f'±1σ = {std:.4f}')
+    # KDE 曲线
+    plt.plot(xs, y, color=main_color, linewidth=2.5)
+    # 均值标记
+    plt.axvline(mean, color=mean_color, linestyle='--', linewidth=2, label=f'Mean = {mean:.4f}')
+
+    # 坐标轴标签
+    plt.xlabel("Compensation Factor", fontsize=16, fontname='Times New Roman')
+    plt.ylabel("Percentage (%)", fontsize=16, fontname='Times New Roman')
+
+    # 网格和边框
+    plt.grid(True, linestyle='--', alpha=0.5)
+    ax = plt.gca()
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_linewidth(1.2)
+    ax.spines['bottom'].set_linewidth(1.2)
+
+    ax.yaxis.set_major_formatter(PercentFormatter())
+
+    plt.legend(fontsize=12, frameon=False)
     plt.tight_layout()
+    plt.ylim(0, 20)
     plt.show()
 
 if __name__ == "__main__":
-    filename = "../data/log_real/rate.txt"
+    filename = "../data/rate.txt"
     rates = extract_rates(filename)
-    if rates:
-        print(f"Extracted {len(rates)} rate values.")
-        print(f"Average rate = {np.mean(rates):.6f}")
-        print(f"Standard deviation = {np.std(rates):.6f}")
-        
-        plot_rate_histogram(
-            rates,
-            bar_cmap='viridis',
-            edge_color="#ffffff",
-            avg_line_color='#FF6B6B',
-            shade=0.85,
-            text_color='#333333'
-        )
+    error_hill_plot(rates)

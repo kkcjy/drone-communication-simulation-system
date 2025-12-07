@@ -14,15 +14,15 @@
 
 
 /* simulation mode for choosing */
-#define IEEE_802_15_4Z
+// #define IEEE_802_15_4Z
 // #define SWARM_RANGING_V1
 // #define SWARM_RANGING_V2
-// #define DYNAMIC_RANGING
+#define DYNAMIC_RANGING
 // #define COMPENSATE_DYNAMIC_RANGING
 
-// #define REAL_TIME_ENABLE
+#define REAL_TIME_ENABLE
 
-#define     CHECK_POINT             2       // number of nodes queried for distance between two received messages
+#define     CHECK_POINT             0       // number of nodes queried for distance between two received messages
 #define     NODES_NUM               2       // the total number of drones in the system
 #define     PACKET_LOSS             0       // packet loss rate for simulating communication link quality
 #define     RANGING_PERIOD_RATE     1       // rate multiplier for ranging data transmission period
@@ -37,6 +37,7 @@
 typedef         uint16_t                    UWB_Address_t;
 typedef         uint32_t                    TickType_t;
 typedef         long                        BaseType_t;
+#define         NULL_TIMESTAMP              0xFFFFFFFFFFU
 #define         ASSERT                      assert
 #define         DWT_TIME_UNITS              (1.0/499.2e6/128.0)
 #define         portTickType                TickType_t
