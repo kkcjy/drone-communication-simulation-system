@@ -1,3 +1,3 @@
 [submodule "AdHocUWB"]
 	path = AdHocUWB
-	url = https://github.com/SEU-NetSI/AdHocUWB.git
+	url = git@github.com:kkcjy/TDoA-DSR-Compat-Framework.git
