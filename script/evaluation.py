@@ -12,10 +12,17 @@ from scipy.stats import gaussian_kde
 
 # Set the active address and use the target address’s time range as the alignment reference
 RESULT_REPRODUCTION = False
-REAL_TIME_ENABLE = True
+REAL_TIME_ENABLE = False
 CHECK_POINT = 8
 local_address = 2
 neighbor_address = 3
+
+# leftbound = 90318492
+# rightbound = 90320545
+# leftbound = 97855212
+# rightbound = 97855386
+# leftbound = 97906430
+# rightbound = 97916740
 leftbound = 1409700
 rightbound = 1423480
 # leftbound = 1719676
@@ -27,11 +34,11 @@ rightbound = 1423480
 invalid_sign = -1
 
 sys_path = "../data/simulation_dep.csv"
-ieee_path = "../data/log_real_8/ieee.txt"
-sr_v1_path = "../data/log_real_8/swarm_v1.txt"
-sr_v2_path = "../data/log_real_8/swarm_v2.txt"
-dsr_path = "../data/log_real_8/dynamic.txt"
-cdsr_path = "../data/log_real_8/compensate.txt"
+ieee_path = "../data/log_loss_15/ieee.txt"
+sr_v1_path = "../data/log_loss_15/swarm_v1.txt"
+sr_v2_path = "../data/log_loss_15/swarm_v2.txt"
+dsr_path = "../data/log_loss_15/dynamic.txt"
+cdsr_path = "../data/log_loss_15/compensate.txt"
 vicon_path = "../data/vicon.txt"
 output_path = "../data/ranging_log.csv"
 
@@ -195,6 +202,8 @@ def write_ranging_log(ieee, ieee_sys_time, sr_v1, sr_v1_sys_time, sr_v2, sr_v2_s
     cdsr_sys_time = np.array(cdsr_sys_time)
     vicon = np.array(vicon)
     vicon_sys_time = np.array(vicon_sys_time)
+
+    print(len(ieee),len(sr_v1),len(sr_v2),len(dsr),len(cdsr),len(vicon))
 
     common_time = set(ieee_sys_time) & set(sr_v1_sys_time) & set(sr_v2_sys_time) & set(dsr_sys_time) & set(cdsr_sys_time)
     common_time = sorted(list(common_time))
@@ -444,12 +453,13 @@ def evaluation_data_motion_static(align_sr_v2, sr_v2_sys_time, align_cdsr, cdsr_
 
 def sr_vicon_plot(sr, sr_sys_time, vicon, vicon_sys_time, sr_name="DS-TWR"):
     fig, ax1 = plt.subplots(figsize=(24, 14))
+    vicon_sys_time = np.asarray(vicon_sys_time)
     
     ax1.set_xlabel('Time (ms)', fontsize=40, labelpad=40)
     ax1.set_ylabel('Distance (cm)', fontsize=40, labelpad=40)
     
-    l1, = ax1.plot(sr_sys_time, sr, color=sr_color, linestyle='-', linewidth=4, marker='o', markersize=6, label='DS-TWR')
-    l2, = ax1.plot(vicon_sys_time, vicon, color=vicon_color, linestyle='-', linewidth=4, label='VICON')
+    l1, = ax1.plot(sr_sys_time - 1.53*10**6, sr, color=sr_color, linestyle='-', linewidth=4, marker='o', markersize=6, label='DS-TWR')
+    l2, = ax1.plot(vicon_sys_time - 1.53*10**6, vicon, color=vicon_color, linestyle='-', linewidth=4, label='Ground Truth')
     
     ax1.tick_params(axis='x', labelsize=35)
     ax1.tick_params(axis='y', labelsize=35)
@@ -462,7 +472,7 @@ def sr_vicon_plot(sr, sr_sys_time, vicon, vicon_sys_time, sr_name="DS-TWR"):
     align_vicon_interp = np.interp(sys_time, vicon_sys_time, vicon)
     sr_error = np.abs(sr - align_vicon_interp)
     
-    l3, = ax2.plot(sys_time, sr_error, color=sr_error_color, linestyle='-.', linewidth=4, label='Error (DS-TWR)')
+    l3, = ax2.plot(sys_time - 1.53*10**6, sr_error, color=sr_error_color, linestyle='-.', linewidth=4, label='Error (DS-TWR)')
     
     ax2.tick_params(axis='y', labelsize=35)
     
@@ -474,13 +484,14 @@ def sr_vicon_plot(sr, sr_sys_time, vicon, vicon_sys_time, sr_name="DS-TWR"):
 
 def dsr_sr_vicon_plot(dsr, sr, sys_time, align_vicon, vicon_sys_time, dsr_std=None, sr_std=None):
     fig, ax1 = plt.subplots(figsize=(24, 14))
+    vicon_sys_time = np.asarray(vicon_sys_time)
     
     ax1.set_xlabel('Time (ms)', fontsize=40, labelpad=40)
     ax1.set_ylabel('Distance (cm)', fontsize=40, labelpad=40)
     
-    l1, = ax1.plot(sys_time, sr, color=sr_color, linestyle='-', linewidth=4, label='DSR-IC (Divergent)')
-    l2, = ax1.plot(sys_time, dsr, color=dsr_ic_color, linestyle='-', linewidth=4, label='DSR-IC (Convergent)')
-    l3, = ax1.plot(vicon_sys_time, align_vicon, color=vicon_color, linestyle='-', linewidth=4, label='VICON')
+    l1, = ax1.plot(sys_time - 9.79*10**7, sr, color=sr_color, linestyle='-', linewidth=4, label='SRv2')
+    l2, = ax1.plot(sys_time - 9.79*10**7, dsr, color=dsr_ic_color, linestyle='-', linewidth=4, label='DSR')
+    l3, = ax1.plot(vicon_sys_time - 9.79*10**7, align_vicon, color=vicon_color, linestyle='-', linewidth=4, label='Ground Truth')
     
     ax1.tick_params(axis='x', labelsize=35)
     ax1.tick_params(axis='y', labelsize=35)
@@ -493,12 +504,12 @@ def dsr_sr_vicon_plot(dsr, sr, sys_time, align_vicon, vicon_sys_time, dsr_std=No
     dsr_error = np.abs(dsr - align_vicon_interp)
     sr_error = np.abs(sr - align_vicon_interp)
     
-    l4, = ax2.plot(sys_time, sr_error, color=sr_error_color, linestyle='-.', linewidth=4, label='Error (Divergent)')
-    l5, = ax2.plot(sys_time, dsr_error, color=dsr_ic_error_color, linestyle='-.', linewidth=4, label='Error (Convergent)')
+    l4, = ax2.plot(sys_time - 9.79*10**7, sr_error, color=sr_error_color, linestyle='-.', linewidth=4, label='Error (SRv2)')
+    l5, = ax2.plot(sys_time - 9.79*10**7, dsr_error, color=dsr_ic_error_color, linestyle='-.', linewidth=4, label='Error (DSR)')
     
     ax2.tick_params(axis='y', labelsize=35)
     
-    lines = [l1, l2, l3, l4, l5]
+    lines = [l1, l2, l3,l4,l5]
     labels = [line.get_label() for line in lines]
     ax1.legend(lines, labels, fontsize=30, loc='upper left', frameon=False, ncol=2, columnspacing=3)
     plt.tight_layout()
@@ -509,12 +520,12 @@ def ranging_plot(ranging1, ranging1_sys_time, ranging2, ranging2_sys_time, rangi
     
     ax1.set_xlabel('Time (ms)', fontsize=40, labelpad=40)
     ax1.set_ylabel('Distance (cm)', fontsize=40, labelpad=40)
-    
-    l1, = ax1.plot(ranging1_sys_time, ranging1, color=sr_color, linestyle='-', linewidth=4, label='DS-TWR')
-    l2, = ax1.plot(ranging2_sys_time, ranging2, color=dsr_ic_color, linestyle='-', linewidth=4, label='DSR-IC')
-    l3, = ax1.plot(ranging3_sys_time, ranging3, color=dsr_color, linestyle='-', linewidth=4, label='DSR')
-    l4, = ax1.plot(vicon_sys_time, vicon, color=vicon_color, linestyle='-', linewidth=4, label='VICON')
-    
+    vicon_sys_time = np.asarray(vicon_sys_time)
+    l1, = ax1.plot(ranging1_sys_time - 1.4*10**6, ranging1, color=sr_color, linestyle='-', linewidth=4, label='SRv2')
+    l2, = ax1.plot(ranging2_sys_time - 1.4*10**6, ranging2, color=dsr_ic_color, linestyle='-', linewidth=4, label='DSR-IC')
+    l3, = ax1.plot(ranging3_sys_time - 1.4*10**6, ranging3, color=dsr_color, linestyle='-', linewidth=4, label='DSR')
+    l4, = ax1.plot(vicon_sys_time - 1.4*10**6, vicon, color=vicon_color, linestyle='-', linewidth=4, label='Ground Truth')
+
     ax1.tick_params(axis='x', labelsize=35)
     ax1.tick_params(axis='y', labelsize=35)
     ax1.grid(True, linestyle='--', alpha=0.3)
@@ -528,9 +539,9 @@ def ranging_plot(ranging1, ranging1_sys_time, ranging2, ranging2_sys_time, rangi
     dsr_ic_error = np.abs(ranging2 - align_vicon_interp)
     dsr_error = np.abs(ranging3 - align_vicon_interp)
     
-    l5, = ax2.plot(sys_time, sr_error, color=sr_error_color, linestyle='-.', linewidth=4, label='Error (DS-TWR)')
-    l6, = ax2.plot(sys_time, dsr_ic_error, color=dsr_ic_error_color, linestyle='-.', linewidth=4, label='Error (DSR-IC)')
-    l7, = ax2.plot(sys_time, dsr_error, color=dsr_error_color, linestyle='-.', linewidth=4, label='Error (DSR)')
+    l5, = ax2.plot(sys_time - 1.4*10**6, sr_error, color=sr_error_color, linestyle='-.', linewidth=4, label='Error (SRv2)')
+    l6, = ax2.plot(sys_time - 1.4*10**6, dsr_ic_error, color=dsr_ic_error_color, linestyle='-.', linewidth=4, label='Error (DSR-IC)')
+    l7, = ax2.plot(sys_time - 1.4*10**6, dsr_error, color=dsr_error_color, linestyle='-.', linewidth=4, label='Error (DSR)')
     
     ax2.tick_params(axis='y', labelsize=35)
     
@@ -719,7 +730,7 @@ def error_hill_plot(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, v
 
     def qline(q, color):
         plt.axvline(q, 0, 1, color=color, linestyle="--", linewidth=2)
-        plt.text(q - 0.1, ymax * (3)/4, f"{q:.1f} cm", color=color, fontsize=20, ha="right", fontweight="bold")
+        plt.text(q - 0.1, ymax * (3)/4, f"{q:.1f} cm", color=color, fontsize=25, ha="right", fontweight="bold")
 
     qline(q1, c1)
     qline(q2, c2)
@@ -756,15 +767,15 @@ if __name__ == '__main__':
 
     align_ieee, align_sr_v1, align_sr_v2, align_dsr, align_cdsr, align_vicon, avg_diff = get_align_data(ieee, sr_v1, sr_v2, dsr, cdsr, sys_time, vicon, vicon_sys_time)
 
-    # evaluation_data(align_ieee, sys_time, align_sr_v1, sys_time, align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, avg_diff)
+    evaluation_data(align_ieee, sys_time, align_sr_v1, sys_time, align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, avg_diff)
 
     # sr_vicon_plot(align_sr_v2, sys_time, align_vicon, vicon_sys_time, sr_name="DS-TWR")
 
-    # sr_vicon_plot(align_dsr, sys_time, align_vicon, vicon_sys_time, sr_name="DSR-IC")
+    # sr_vicon_plot(align_cdsr, sys_time, align_vicon, vicon_sys_time, sr_name="DSR-IC")
 
-    # dsr_sr_vicon_plot(align_cdsr, align_sr_v2, sys_time, align_vicon, vicon_sys_time)
+    dsr_sr_vicon_plot(align_cdsr, align_sr_v2, sys_time, align_vicon, vicon_sys_time)
 
-    ranging_plot(align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, name1="DS-TWR", name2="DSR-IC", name3="DSR")
+    # ranging_plot(align_sr_v2, sys_time, align_dsr, sys_time, align_cdsr, sys_time, align_vicon, vicon_sys_time, name1="SRv2", name2="DSR-IC", name3="DSR")
 
     # evaluation_relative_move(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time, left = 1537080, right = 1538579)
 
@@ -772,6 +783,6 @@ if __name__ == '__main__':
 
     # error_histogram_plot(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time, name1="DS-TWR", name2="DSR-IC", name3="DSR")
 
-    # error_hill_plot(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time, name1="DS-TWR", name2="DSR-IC", name3="DSR")
+    # error_hill_plot(align_sr_v2, align_dsr, align_cdsr, align_vicon, sys_time, vicon_sys_time, name1="SRv2", name2="DSR-IC", name3="DSR")
 
     # evaluation_data_motion_static(align_sr_v2, sr_v2_sys_time, align_cdsr, cdsr_sys_time, align_vicon, vicon_sys_time, avg_diff)

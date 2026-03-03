@@ -20,7 +20,7 @@
 // #define DYNAMIC_RANGING
 #define COMPENSATE_DYNAMIC_RANGING
 
-#define REAL_TIME_ENABLE
+// #define REAL_TIME_ENABLE
 
 #define     CHECK_POINT             0       // number of nodes queried for distance between two received messages
 #define     NODES_NUM               2       // the total number of drones in the system

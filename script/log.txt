@@ -1,0 +1,24 @@
+rate = 1
+IEEE : Mean AE(平均绝对误差) = 8.137 cm, Max AE(最大绝对误差) = 34.701 cm, RMSE(均方根误差) = 10.243 cm
+SRv2: Mean AE(平均绝对误差) = 6.287 cm, Max AE(最大绝对误差) = 26.555 cm, RMSE(均方根误差) = 7.860 cm
+DSR : Mean AE(平均绝对误差) = 4.442 cm, Max AE(最大绝对误差) = 26.520 cm, RMSE(均方根误差) = 5.772 cm
+
+rate = 2
+IEEE : Mean AE(平均绝对误差) = 11.918 cm, Max AE(最大绝对误差) = 51.533 cm, RMSE(均方根误差) = 15.317 cm
+SRv2: Mean AE(平均绝对误差) = 7.207 cm, Max AE(最大绝对误差) = 28.604 cm, RMSE(均方根误差) = 8.969 cm
+DSR : Mean AE(平均绝对误差) = 6.074 cm, Max AE(最大绝对误差) = 28.330 cm, RMSE(均方根误差) = 7.891 cm
+
+rate = 3
+IEEE : Mean AE(平均绝对误差) = 15.886 cm, Max AE(最大绝对误差) = 69.001 cm, RMSE(均方根误差) = 20.884 cm
+SRv2: Mean AE(平均绝对误差) = 8.778 cm, Max AE(最大绝对误差) = 38.655 cm, RMSE(均方根误差) = 11.154 cm
+DSR : Mean AE(平均绝对误差) = 8.088 cm, Max AE(最大绝对误差) = 36.209 cm, RMSE(均方根误差) = 10.504 cm
+
+rate = 4
+IEEE : Mean AE(平均绝对误差) = 19.955 cm, Max AE(最大绝对误差) = 96.050 cm, RMSE(均方根误差) = 26.753 cm
+SRv2: Mean AE(平均绝对误差) = 10.740 cm, Max AE(最大绝对误差) = 51.588 cm, RMSE(均方根误差) = 13.849 cm
+DSR : Mean AE(平均绝对误差) = 10.102 cm, Max AE(最大绝对误差) = 42.993 cm, RMSE(均方根误差) = 13.237 cm
+
+rate = 5
+IEEE : Mean AE(平均绝对误差) = 23.749 cm, Max AE(最大绝对误差) = 120.389 cm, RMSE(均方根误差) = 32.012 cm
+SRv2: Mean AE(平均绝对误差) = 12.489 cm, Max AE(最大绝对误差) = 65.879 cm, RMSE(均方根误差) = 16.407 cm
+DSR : Mean AE(平均绝对误差) = 11.847 cm, Max AE(最大绝对误差) = 50.777 cm, RMSE(均方根误差) = 15.690 cm
