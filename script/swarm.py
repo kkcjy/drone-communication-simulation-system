@@ -94,7 +94,7 @@ for name, values in reduction_ieee.items():
         color=colors[name]["IEEE"],
         markerfacecolor=colors[name]["IEEE"],
         markeredgecolor=colors[name]["IEEE"],
-        label=f"{name} (DSR vs IEEE)"
+        label=f"{name} (DSR vs 802.15.4z)"
     )
 
 ax.set_xlabel(

@@ -40,7 +40,7 @@ def plot_metric(ax, y_twr, y_dsr, y_rr, ylabel):
     ax.plot(x, y_dsr, color=colors[1], marker='s',
             linewidth=3, markersize=6)
 
-    ax.set_xlabel('Calculation Frequency per Cycle', fontsize=20)
+    ax.set_xlabel('Calculation Frequency per Interval', fontsize=20)
     ax.set_ylabel(ylabel, fontsize=20)
     ax.set_xticks(x)
     ax.tick_params(axis='both', labelsize=20)
@@ -80,7 +80,7 @@ fig.legend(handles=legend_elements,
 
 fig.subplots_adjust(
     left=0.07,   # 左边距
-    right=0.95,  # 右边距
+    right=0.92,  # 右边距
     top=0.88,    # 上边距，留图例位置
     bottom=0.08, # 下边距
     hspace=0.4,  # 上下子图间距
